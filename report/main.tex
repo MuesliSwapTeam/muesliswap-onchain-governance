@@ -1,0 +1,391 @@
+\documentclass[11pt]{article}
+\usepackage[utf8]{inputenc}
+\usepackage{geometry}
+\usepackage{graphicx}
+\usepackage{hyperref}
+\usepackage{amsmath}
+\usepackage{amsfonts}
+\usepackage{amssymb}
+\usepackage{color}
+\usepackage[capitalise,noabbrev]{cleveref}
+\usepackage{caption}
+\usepackage{subcaption}
+\geometry{a4paper}
+
+\title{MuesliSwap On-Chain Governance Platform}
+\author{MuesliSwapTeam}
+\date{\today}
+
+\usepackage{biblatex}
+\addbibresource{references.bib}
+
+
+\begin{document}
+
+\maketitle
+% \newpage
+% \tableofcontents
+% \newpage
+
+\section{Introduction}
+\subsection{Background}
+In the rapidly evolving world of blockchain technology, on-chain governance has emerged as a pivotal aspect for the sustainable and democratic management of decentralized protocols.
+The intricate balance between decentralization, security, and efficiency poses unique challenges and opportunities.
+This document delves into the cutting-edge realm of on-chain governance by presenting a comprehensive analysis and strategic implementation plan, focusing on the design and functionality of a treasury contract and an interface for protocol parameter updates on the Cardano Blockchain.
+
+\subsection{Purpose of the Document}
+The primary objective of this document is to serve as a detailed guide for the development, analysis, and integration of advanced governance mechanisms within blockchain protocols.
+It aims to provide a robust framework for designing a treasury contract, an interface for updating protocol parameters, and a comparative analysis of existing on-chain governance solutions.
+This document is intended for developers, stakeholders, and decision-makers involved in blockchain governance and development.
+
+\subsection{Scope}
+The scope of this document encompasses three main areas:
+Firstly, it provides a detailed design and functional specification for a treasury contract and a protocol parameter update interface, ensuring these components align with the overarching goals of security, transparency, and user accessibility.
+Secondly, it presents a comparative analysis of existing on-chain governance models, highlighting their strengths, weaknesses, and applicability in various contexts.
+Lastly, it outlines a comprehensive integration plan for embedding these governance components into an existing off-chain voting platform, detailing the technical, procedural, and risk management aspects of such an integration.
+This holistic approach ensures a thorough understanding and effective implementation of on-chain governance solutions.
+
+
+\section{Detailed Design and Functional Specifications}
+
+This section outlines the desired capabilities and functionality of the MuesliSwap On-Chain governance platform.
+
+\subsection{Overview of the Platform}
+The platform consists of a set of smart contracts that allow control over funds and on-chain parameters
+of the MuesliSwap development treasury and decentralized exchange.
+Moreover it provides a user friendly interface for the community to propose and vote on proposals.
+It complements the existing governance forum, which is available to facilitate discussion on MuesliSwap governance,
+as well as the existing off-chain governance platform that allows secure, private and scalable voting.
+
+\subsubsection{Objectives}
+The governance platform is built to allow holders of the MuesliSwap MILK token to participate in
+decisions that affect the MuesliSwap protocol proportional to their stake in the project in form of holdings.
+It should further allow any holder of the MILK token to propose changes to the protocol and
+vote on proposals that are submitted by other users.
+The results of proposals should be binding and enforceable by the smart contracts and will be documented
+on-chain through the nature of the platform.
+
+\subsubsection{Design Principles}
+
+The platform will by design represent most interactions by submitting transactions to the Cardano blockchain.
+These will be transparently visible to all users and verifiable by anyone.
+We note that this may incur cost for users, which is outlined in recent studies as a major drawback of on-chain governance \cite{feichtinger2023hidden}.
+
+However, due to the integration with the off-chain governance platform, users will be able to vote on-chain
+only for situations where the benefit of on-chain governance (e.g. transparency, enforceability) justifies the cost of the process.
+
+The platform is designed such that the governance process can not be controlled by a single entity.
+
+Another key factor is modularity in the design.
+The platform will mainly take care of tallying votes.
+Contracts that are affected by the voting process will be responsible for handling the effects of the voting process themselves.
+This includes i.e. the MuesliSwap Pools contract, which needs to be upgraded such that it can process the outcome of votes.
+The treasury is provided in the development of this project as a reference implementation of such a contract.
+
+Meanwhile, the contract supports the possibility of an upgrade.
+This is to ensure that the contract can be upgraded in case of a bug or security vulnerability or simply to support
+relevant features.
+Rather than forcing every consumer to upgrade the consumed contract,
+the contract will allow moving the governance thread to a new contract version.
+The alternative would be to allow consumers to upgrade the governance contract which they track -
+which implies that for every upgrade of the governance contract, every consumer would have to be upgraded as well.
+This would be a major burden for consumers of the contract and can lead to security issues due to pending upgrades.
+
+To avoid double voting, it is necessary to lock governance tokens during the voting process.
+The protocol is designed to minimize the time that tokens are locked and to reduce the cost of participation.
+In subsequent extensions, we will explore the possibility of allowing users to delegate their voting power to other users,
+use staked tokens for participation in the governance process, and other mechanisms to reduce the cost of participation.
+
+\subsubsection{Architecture}
+
+The protocol consists of a set of smart contracts that are deployed on the Cardano blockchain.
+The main component is the \emph{Governance} contract, which is responsible for the overall governance process.
+It is used to track submitted proposals by users and tally voting results.
+Users can consume the current state of the proposal to add their vote to the tally,
+in the process locking their funds into the \emph{Locking} contract until after the voting period has ended.
+Should they decide to withdraw their vote before the end of the voting period, they can do so by consuming the
+state of the propsal and the locked funds.
+This process is depicted in \cref{fig:utxo-flow-vote-complete}.
+
+\begin{figure}
+    \centering
+    \begin{subfigure}[b]{0.5\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{figures/userflow-contracts-1.pdf}
+        \caption{Voting consumes the current state of the proposal and locks the voting funds.}
+        \label{fig:utxo-flow-vote}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}[b]{0.35\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{figures/userflow-contracts-3.pdf}
+        \caption{After the voting period has ended, the user can withdraw their locked funds.}
+        \label{fig:utxo-flow-withdraw}
+    \end{subfigure}
+    \hfill
+    \vspace{1em}
+    \begin{subfigure}[b]{0.5\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{figures/userflow-contracts-2.pdf}
+        \caption{The user can retract a vote by consuming the current state of the proposal and the locked funds.}
+        \label{fig:utxo-flow-retract}
+    \end{subfigure}
+    \caption{Example UTxO flow for a vote.}
+    \label{fig:utxo-flow-vote-complete}
+\end{figure}
+
+Moreover there is one \emph{Treasury} contract for managing the funds of the MuesliSwap development treasury.
+It processes the outcome of the voting process and executes the result of the vote by distributing the funds correspondingly.
+The handling of protocol parameter updates is left to the specific parameterizable protocol components,
+such as the MuesliSwap \emph{Pools} contract.
+
+\subsection{Protocol Parameter Update Interface}
+
+The result of the voting process will remain as an immutable tally result in the Governance contract
+indefinitely.
+Thus it can be consumed by the protocol components as a reference UTxO to update their internal state accordingly.
+An example of the parameter updates that are possible through the Governance contract is the changing of pool swap fees
+or changing its stake key.
+An example UTxO flow is depicted in \cref{fig:utxo-flow-params}.
+
+\begin{figure}
+    \centering
+    \includegraphics[width=0.35\textwidth]{figures/userflow-contracts-4.pdf}
+    \caption{Example UTxO flow for a parameter update}
+    \label{fig:utxo-flow-params}
+\end{figure}
+
+\subsection{Treasury Distribution Interface}
+
+The Treasury contract will be responsible for managing the funds of the MuesliSwap development treasury.
+For this, the result of the voting process will be consumed by the Treasury contract and the funds will be distributed accordingly.
+The resulting UTxO flow will be similar in nature to the parameter update, as depicted in \cref{fig:utxo-flow-params}.
+
+\subsubsection{Functional Requirements}
+
+The platform needs to allow every token holder to participate in the governance process by submitting or voting on proposals.
+To this end, both accessible user-interfaces as well as manual interaction with the contracts must be possible.
+The platform needs to ensure that operability is not centralized, i.e. that no single entity can control the outcome or block the progressing of the voting process.
+
+\subsubsection{User Interface Design}
+The user interface will be oriented along the existing off-chain governance platform.
+It is crucial to ensure that the user interface is intuitive and easy to use and displays all relevant information
+of the on-chain proposals and votes clearly and concisely.
+
+\subsubsection{Security Considerations}
+
+To avoid spam, the platform will require a minimum amount of tokens to be locked in order to submit a proposal.
+In case the proposal passes, the locked tokens will be returned to the submitter.
+In case the proposal fails, the locked tokens will be distributed to the voters or the treasury.
+Allowing distribution to voters creates a natural incentive to participate in the voting process, even if it is expected that the proposal will fail.
+Distribution to the treasury increases the value of the treasury and thus the value of the protocol.
+A split between these choices is also a reasonable option.
+
+It is crucial to ensure that voting results can only be effectful once for each component that they influence.
+Otherwise it may be possible to withdraw funds multiple times from the treasury or to change a parameter to an outdated value after a new proposal has been passed.
+Therefore every proposal will be assigned a monotonously increasing proposal ID.
+Protocol components must then ensure that they only allow consumption of a strictly increasing proposal ID.
+
+Moreover it is important to ensure that controlled funds can only be counted once for each proposal.
+
+\section{Comparative Analysis of Existing Governance Solutions}
+
+In this section we explore the current state of On-Chain and Off-Chain Governance solutions on Cardano.
+Further we explore design choices in other blockchain ecosystems.
+
+\subsection{Methodology}
+This subsection delineates the methodology employed in the comparative analysis of existing on-chain governance solutions.
+The primary goal of this analysis is to critically assess and compare various governance models,
+highlighting their unique features, strengths, and limitations in the context of blockchain technology and decentralized decision-making processes.
+
+\subsubsection{Selection Criteria for Governance Models}
+
+First of all, we try to collect all governance models currently deployed or under development on the Cardano blockchain.
+In addition, we explore governance models that are deployed on other blockchains based on their prevalence in the industry, innovativeness, impact on user engagement, and scalability.
+
+\subsubsection{Data Collection and Sources}
+Data and information regarding each governance model are collected from a variety of sources, including academic journals, press releases, reports and whitepapers.
+This comprehensive approach ensures a well-rounded understanding of each model and its real-world implications.
+
+\subsubsection{Evaluation Metrics}
+The comparative analysis employs a set of predefined metrics to evaluate each governance model.
+These metrics encompass:
+
+\begin{itemize}
+    \item \textbf{Efficiency:} Assessing the speed and resource utilization in decision-making processes.
+    \item \textbf{Security:} Evaluating the robustness of each model against common threats and vulnerabilities.
+    \item \textbf{Decentralization:} Measuring the degree of power distribution among participants.
+    \item \textbf{User Incentivization:} Analyzing how each model encourages and facilitates active participation from its stakeholders.
+\end{itemize}
+
+\subsubsection{Analytical Approach}
+The analysis is conducted through a multi-dimensional approach, considering both qualitative and quantitative aspects of each model. Qualitative analysis provides insights into the governance structure, user experience, and potential socio-economic impacts. Quantitative analysis, on the other hand, involves statistical evaluation of performance metrics and user engagement data.
+
+\subsubsection{Comparative Framework}
+A structured comparative framework is employed to systematically evaluate each model against the set metrics. This framework aids in highlighting the contrasts and similarities among the various governance models, providing a clear and concise comparative overview.
+
+\subsubsection{Limitations and Assumptions}
+The methodology acknowledges certain limitations and assumptions. Limitations may arise from the availability and recency of data, while assumptions are made regarding the general applicability of each model in different blockchain ecosystems. These factors are taken into account to ensure a balanced and fair analysis.
+
+The outcome of this methodology is expected to provide valuable insights into the effectiveness and applicability of different on-chain governance models, guiding future developments and decision-making processes in the realm of blockchain governance.
+
+\subsection{Governance Models on Cardano}
+
+We explore a comprehensive set of governance models, including both on-chain and off-chain solutions
+that are currently in use on the Cardano Blockchain.
+
+\subsubsection{MuesliSwap Off-Chain Governance}
+
+The MuesliSwap Off-Chain Governance platform is a decentralized voting platform that allows users to vote on proposals regarding the MuesliSwap protocol \cite{muesliswap-offchain}.
+It is built on top of the peer-reviewed Helios protocol \cite{DBLP:conf/uss/Adida08}.
+This platform allows for secure, private, and scalable voting, while ensuring that the results of the vote are publicly verifiable.
+At the same time, the design of the platform ensures that no fees are incurred for neither the platform operators nor the voters.
+
+However, due to the nature of being entirely off-chain the protocol does not allow for enforceable on-chain effects of the voting result.
+It is therefore not further analyzed in this document.
+
+\begin{itemize}
+    \item \textbf{Efficiency:} High. As an off-chain solution, the method can scale well.
+    \item \textbf{Security:} High. The protocol is based on the peer-reviewed Helios protocol that ensures verifiability and privacy.
+    \item \textbf{Decentralization:} Low. The MuesliSwapTeam is hosting the results on a server, which may be subject to failure. A selected set of administrators is able to create and tally votes. Results are not enforceable on-chain.
+    \item \textbf{User Incentivization:} Medium. While not incurring any additional costs for participants, there is also no direct incentive for users to participate in the voting process.
+\end{itemize}
+
+\subsubsection{SundaeSwap On-Chain Governance}
+
+SundaeSwap is a decentralized exchange built on the Cardano blockchain
+and has recently also launched their own ``on-chain governance''\cite{Labs-2023}.
+It works in the same fashion as the MuesliSwap Off-Chain Governance,
+however it publishes commitment to user votes on the Cardano blockchain.
+
+Users can thus verify that their vote has been taken into account by checking the produced on-chain commitment.
+This increases the immutability of the voting process and allows for a more transparent process,
+at the cost of increased transaction fees for the protocol operators.
+
+Since this governance model is very similar to the MuesliSwap Off-Chain Governance and does not allow
+any on-chain effects of the voting process, it will not be analyzed in detail in this document.
+
+\begin{itemize}
+    \item \textbf{Efficiency:} High. As a mainly off-chain batching solution, the method can scale well.
+    \item \textbf{Security:} Unclear. The implementation is not yet available and the security of the protocol is not clear from the documentation.
+    \item \textbf{Decentralization:} Low. SundaeSwapLabs is required to continue running a server to publish results on-chain, which may be subject to failure. A selected set of administrators is able to create and tally votes. Results are not enforceable on-chain.
+    \item \textbf{User Incentivization:} Medium. While not incurring any additional costs, there is also no direct incentive for users to participate in the voting process.
+\end{itemize}
+
+\subsection{Wingriders On-Chain Governance}
+
+Wingriders is a decentralized exchange built on the Cardano blockchain.
+They have launched their own on-chain governance platform in October 2022 \cite{wingriders-medium}.
+There is not much detail on its operation available online, but a published auditing tools for votes
+indicates that the voting process simply consists of submitting a transaction to the Cardano blockchain with metadata indicating their preference.
+This implies zero privacy for participants, as their voting preference is directly linked to their wallet address and publicly accessible,
+however also ensures immutability and transparency.
+The protocol operators tally the results by taking a snapshot of the voter wallets and their respective voting power at the end of the voting period. \cite{wingriders-github}
+The only way to ensure correct tallying is by rerunning the whole tallying procedure.
+
+The Wingriders protocol allows any user to submit proposals,
+however requires a minimum amount of tokens to be locked in order to submit a proposal.
+This serves as a spam protection mechanism and ensures that only serious proposals are submitted.
+
+This governance model is rather centralized, as the voting process is controlled by the protocol operators.
+It does not also not allow for any enforceable on-chain effects of the voting process,
+since metadate is invisible to Cardano Smart Contracts.
+It is therefore not further analyzed in this document.
+
+\begin{itemize}
+    \item \textbf{Efficiency:} High. Users submit Metadata transactions to the Cardano blockchain. This scales proportional with overall throughput of the Blockchain.
+    \item \textbf{Security:} High. The protocol uses the Cardano blockchain to ensure verifiability and immutability.
+    \item \textbf{Decentralization:} Medium. Results have to be tallied by the protocol operators and results are not enforceable on-chain.
+    \item \textbf{User Incentivization:} Low. Participation incurs cost and there is no direct incentive for users to participate in the voting process.
+\end{itemize}
+
+\subsubsection{Agora}
+LiqwidDAO's governance system is built upon an open-source governance framework called Agora\cite{liqwidagora}, developed by Liqwid Labs.
+
+LiqwidDAO's Agora consists of interconnected smart contracts that together create a governance framework.
+In this system, users can participate by staking their LQ tokens.
+This staking process grants them the ability to initiate and cast votes on various proposals.
+The influence of a user's vote is directly proportional to the quantity of LQ tokens they have staked.
+Each stake is associated with the user's public key, ensuring that proposing an idea or voting on one necessitates verifying one's identity by signing the transaction with the corresponding key.
+
+Further, the whole system is built on top of the Cardano blockchain, which ensures that all transactions are immutable and transparent.
+Votes are not private.
+Every vote has to consume the current state of the proposal, which is a UTxO that is updated by the Agora contract.
+This means that the scalability of the system is limited by the fact that all votes have to be submitted in serial order, as they consume the current state of the proposal.
+
+\begin{itemize}
+    \item \textbf{Efficiency:} Low. The protocol involves submitting votes and updates to the governance progress in series and thus does not scale well.
+    \item \textbf{Security:} High. The protocol uses the Cardano blockchain to ensure verifiability and immutability.
+    \item \textbf{Decentralization:} High. The protocol allows for on-chain enforceability of the voting results. The voting process is not controlled by a single entity.
+    \item \textbf{User Incentivization:} Low. Participation incurs cost and there is no direct incentive for users to participate in the voting process.
+\end{itemize}
+
+\subsubsection{Clarity DAO}
+
+Clarity DAO is a project focusing on providing DAO infrastructure to projects on Cardano \cite{panchot2023clarity}.
+The Clarity Protocol is built on top of Agora and does hence not require an additional investigation regarding protocol performance.
+
+
+
+\subsection{Governance Models on other Platforms}
+
+In addition, we explore design choices of governance models that are deployed on other blockchains.
+They are not explored in detail, but provide valuable insights into the design space of on-chain governance.
+
+\subsubsection{Aragon Network}
+
+Aragon is an advanced DAO building infrastructure built on Ethereum \cite{aragon}.
+It is a suite of smart contracts and tools that enable the creation of DAOs with advanced features such as token issuance, voting, and fundraising.
+Aragon's governance model is based on the concept of liquid democracy, where users can delegate their voting power to other users.
+This allows for a more efficient and flexible voting process, as users can choose to vote directly or delegate their voting power to a trusted party.
+
+\subsubsection{Tally / OpenZeppelin Governor}
+
+Tally is a voting platform built on top of the OpenZeppelin Governor contract \cite{Tally, OpenZeppelin}.
+The OpenZeppelin Governor contract is a central piece of software that controls the voting process, keeps tallys and also enforces outcomes of votes.
+Among the feature set already delivered with the Governor contract is ``disbursing funds from a treasury, adjusting parameters of a DeFi protocol, altering permissions of sub-DAOs, minting NFTs, or even modifying the rules of the Governor contract itself''.
+The contracts are entirely on-chain, therefore also require transactions for interaction.
+
+\subsection{Best Practices and Lessons Learned}
+
+From the analysed platforms, we learn that on-chain governance is a powerful tool to increase transparency and immutability of the governance process.
+However, one must carefully consider the choice of parameters and security guards like spam protection.
+
+Moreover, all contract governed protocols require the locking of tokens during the voting process to avoid double voting.
+Other approaches make use of snapshots, which are currently infeasible to perform on-chain on Cardano
+without a significant form of centralization (in the form of an oracle).
+
+We also discover that most on-chain governance platforms do not allow for enforceable on-chain effects of the voting process,
+which is a major drawback of these platforms.
+At the same time, we acknowledge that the scope of potentially interesting effects is massive.
+Therefore, we propose a modular approach to on-chain governance, where the governance platform is responsible for tallying votes and
+custom implementations of protocol components are responsible for handling the effects of the voting process.
+
+Moreover we find that on-chain governance systems usually allow for self-upgrade of the governance contract,
+and will follow this path.
+Note that on top of the governance contract,
+consuming protocols can implement their own upgrade mechanism.
+
+Due to the lack of enforceable on-chain governance contracts, we conclude that the MuesliSwap On-Chain Governance platform will be a valuable addition to the MuesliSwap ecosystem and the Cardano Ecosystem as a whole.
+
+\section{Integration Plan for New Governance Components}
+\subsection{Overview of the Off-Chain Voting Platform}
+\subsection{Integration Strategy}
+\subsubsection{Technical Requirements}
+\subsubsection{Modification of Existing Components}
+\subsubsection{Adding New Components}
+\subsection{Implementation Steps}
+\subsubsection{Phase 1: Preparation}
+\subsubsection{Phase 2: Implementation}
+\subsubsection{Phase 3: Testing and Deployment}
+\subsection{Risk Assessment and Mitigation Strategies}
+
+\section{Conclusion}
+\subsection{Summary of Findings}
+\subsection{Recommendations for Implementation}
+
+\section{References}
+
+\printbibliography
+
+\end{document}
