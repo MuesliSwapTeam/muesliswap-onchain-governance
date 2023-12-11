@@ -97,28 +97,33 @@ In subsequent extensions, we will explore the possibility of allowing users to d
 use staked tokens for participation in the governance process, and other mechanisms to reduce the cost of participation.
 
 \subsubsection{Architecture}
+\label{sec:architecture}
 
 The protocol consists of a set of smart contracts that are deployed on the Cardano blockchain.
 The main component is the \emph{Governance} contract, which is responsible for the overall governance process.
 It is used to track submitted proposals by users and tally voting results.
-Users can consume the current state of the proposal to add their vote to the tally,
-in the process locking their funds into the \emph{Locking} contract until after the voting period has ended.
+Users join the governance process by locking funds into the \emph{Staking} contract (see \cref{fig:utxo-flow-gov-stake-init}).
+The Staking contract tracks the tallies that the funds are participating in and ensures that
+the voting power of the funds is locked for the duration of the voting process where the funds are participating.
+
+Users can consume the current state of the proposal and their staked tokens to add their vote to the tally,
+in the process updating the staking state such that its funds are locked until after the voting period has ended.
 Should they decide to withdraw their vote before the end of the voting period, they can do so by consuming the
-state of the propsal and the locked funds.
+state of the propsal and the staking state.
 This process is depicted in \cref{fig:utxo-flow-vote-complete}.
 
 \begin{figure}
     \centering
     \begin{subfigure}[b]{0.5\textwidth}
         \centering
-        \includegraphics[width=\textwidth]{figures/userflow-contracts-1.pdf}
-        \caption{Voting consumes the current state of the proposal and locks the voting funds.}
+        \includegraphics[width=\textwidth]{figures/gov-vote.pdf}
+        \caption{Voting consumes the current state of the proposal and informs the staking contract that funds are participating in a tally.}
         \label{fig:utxo-flow-vote}
     \end{subfigure}
     \hfill
     \begin{subfigure}[b]{0.35\textwidth}
         \centering
-        \includegraphics[width=\textwidth]{figures/userflow-contracts-3.pdf}
+        \includegraphics[width=\textwidth]{figures/gov-withdraw-after.pdf}
         \caption{After the voting period has ended, the user can withdraw their locked funds.}
         \label{fig:utxo-flow-withdraw}
     \end{subfigure}
@@ -126,8 +131,8 @@ This process is depicted in \cref{fig:utxo-flow-vote-complete}.
     \vspace{1em}
     \begin{subfigure}[b]{0.5\textwidth}
         \centering
-        \includegraphics[width=\textwidth]{figures/userflow-contracts-2.pdf}
-        \caption{The user can retract a vote by consuming the current state of the proposal and the locked funds.}
+        \includegraphics[width=\textwidth]{figures/gov-withdraw-before.pdf}
+        \caption{The user can retract a vote by consuming the current state of the proposal and the staking status.}
         \label{fig:utxo-flow-retract}
     \end{subfigure}
     \caption{Example UTxO flow for a vote.}
@@ -150,7 +155,7 @@ An example UTxO flow is depicted in \cref{fig:utxo-flow-params}.
 
 \begin{figure}
     \centering
-    \includegraphics[width=0.35\textwidth]{figures/userflow-contracts-4.pdf}
+    \includegraphics[width=0.35\textwidth]{figures/pool-param-update.pdf}
     \caption{Example UTxO flow for a parameter update}
     \label{fig:utxo-flow-params}
 \end{figure}
@@ -187,6 +192,9 @@ Therefore every proposal will be assigned a monotonously increasing proposal ID.
 Protocol components must then ensure that they only allow consumption of a strictly increasing proposal ID.
 
 Moreover it is important to ensure that controlled funds can only be counted once for each proposal.
+For this purpose the staking contract is used that keeps track of all the proposals that the locked funds are participating in.
+The staking contract further needs to ensure that no third party can create a staking position on behalf of another user.
+This would allow retracting votes for other users, which is not desired.
 
 \section{Comparative Analysis of Existing Governance Solutions}
 
@@ -370,19 +378,175 @@ Due to the lack of enforceable on-chain governance contracts, we conclude that t
 
 \section{Integration Plan for New Governance Components}
 \subsection{Overview of the Off-Chain Voting Platform}
+
+The current governance platform on MuesliSwap allows users to submit and vote on proposals tracked in an efficient and secure off-chain voting platform.
+The platform can be accessed through the internet\footnote{The governance platform can be accessed at \url{https://vote.muesliswap.com}} and users can connect
+their Web3 wallets to the platform to participate in the voting process.
+Votes are tallied off-chain and cryptographically signed by the participants, then weighted by the amount of tokens that the participants hold.
+
+The governance platform is built on top of a modified helios server \cite{DBLP:conf/uss/Adida08}.
+This introduces additional complexity when trying to integrate a conceptually different on-chain governance platform.
+
 \subsection{Integration Strategy}
+
+Since the current governance platform is conceptually very different and re-using the existing platform is not feasible,
+we propose to integrate the new on-chain governance platform in a separate process.
+This involves designing a new user interface for the on-chain governance platform,
+as well as a new backend that interacts with the Cardano blockchain.
+The existing governance platform will continue to operate as usual and will be used to discuss proposals and to vote on proposals that do not require on-chain effects.
+Since the new user interface will be built from scratch, it will be possible to integrate the old off-chain governance platform into the existing governance platform natively in the future.
+Until then, the off-chain platform can be integrated visually by linking to the existing platform from the new user interface.
+
 \subsubsection{Technical Requirements}
+
+The new on-chain governance platform will be built on top of the Plutus smart contract platform.
+To have proper access to the Cardano blockchain, the new platform will require a dedicated backend.
+This backend connects to the Cardano blockchain through a Cardano node and processes transactions
+to pre-process information about votes and proposals.
+
+The backend should support the following features:
+\begin{itemize}
+    \item \textbf{Proposal Overview:} The backend should provide the list of valid user submitted proposals.
+    \item \textbf{Proposal Details:} The backend should provide the details of a specific proposal, including the current tally state, deadlines and votes by other users.
+    \item \textbf{Staking Status:} The backend should provide the staking status of a user, i.e. the weight of user votes and which proposals the user is participating in.
+\end{itemize}
+
+The user interface or frontend will connect to the backend and display the information to the user.
+Further it will allow the user to submit new proposals, vote on proposals and withdraw votes.
+For scalability and security, transactions will be built on the client side through the frontend.
+
 \subsubsection{Modification of Existing Components}
+
+The existing governance platform will not be modified in the process.
+However, the new governance platform will allow integration of the existing platform in the future.
+This implies that there will be a transition away from the existing platform in the future.
+
+
 \subsubsection{Adding New Components}
-\subsection{Implementation Steps}
-\subsubsection{Phase 1: Preparation}
-\subsubsection{Phase 2: Implementation}
-\subsubsection{Phase 3: Testing and Deployment}
-\subsection{Risk Assessment and Mitigation Strategies}
+
+The new governance platform will be built from scratch.
+It will consist of a backend that connects to the Cardano blockchain and a frontend that connects to the backend.
+These are entirely new components.
+
+\subsubsection{Implementation Steps}
+
+The implementation of the new governance platform will be done iteratively and accompany the development of the underlying protocol.
+A development of a backend in lockstep with the contract development already helps to ensure that the contracts are usable and that the backend can be tested.
+The frontend can assist in the development of the backend by providing a user interface to test the backend.
+Moreover the ability to submit transactions through the frontend will allow testing of the contracts in a realistic environment.
+
+Overall, the smart contract basics will be developed first.
+This includes the governance contract, the staking contract and the treasury contract.
+The backend will then be developed to interact with the contracts.
+Finally, the frontend will be developed to interact with the backend.
+While there is this fundamental dependency between the components, the development of the components can be done in parallel and iteratively refined as the development progresses.
+
+
+\section{Technical Details}
+
+This sections outlines concrete elements of the final implementation of the MuesliSwap On-Chain Governance platform,
+as well as outlining the UTxO flow for a few more activities.
+
+\subsection{Main Components}
+
+The implementation of the governance platform is designed with the following components.
+\begin{itemize}
+    \item \textbf{GovNFT:} A smart contract that allows minting of one-shot NFTs that have unique names ensured by hashing their input UTxO which is spent in the process.
+    \item \textbf{AuthNFT:} A smart contract that allows minting of NFTs with the same name as a GovNFT, when a GovNFT is spent. This is used to authenticate tally results and should be tracked by consumers.
+    \item \textbf{GovState:} The governance state contract tracks an initialized DAO configuration together with a unique, one-shot minted NFT, the GovNFT.
+    \item \textbf{Governance:} The governance contract tracks the current state of a proposal and allows for tallying votes.
+    \item \textbf{Staking:} The staking contract locks funds for the duration of the voting process.
+    \item \textbf{Treasury:} A treasury contract, which is a consumer of proposals of the Governance contract and distributes funds according to the outcome of the voting process.
+\end{itemize}
+
+Note that consumers of the Governance contract can be any contract that is parameterizable by the voting process.
+The important part is that the contract ensures that tally results are only valid if the AuthNFT is present and matches the expectation.
+While the GovNFT is the token of actual interest, it can not be replicated and hence can not accompany the tally result, which will be consumed by the consuming contract.
+
+To set up a DAO structure, a governance thread has to be initiated by minting a GovNFT.
+It is sent to the GovState contract, which is initialized with the DAO configuration.
+The process is depicted in \cref{fig:utxo-flow-gov-thread-init}.
+
+The thread has to be consumed to create a vote on the Governance Contract, which is a proposal that can be voted on.
+The process for tally initiation is depicted in \cref{fig:utxo-flow-vote-init}.
+By consuming the thread and governance NFT, the GovState contract can control whether an AuthNFT can be minted which needs to accompany the tally result. 
+The general idea of how to update a tally result is presented in \cref{sec:architecture}.
+
+This ensures that it is enough for consumers to track the immutable AuthNFT to verify the tally result,
+while the GovState contract may be upgraded, as depicted in \cref{fig:utxo-flow-gov-thread-upgrade}.
+An upgrade may change the GovState contract, parameters in the thread i.e. the DAO configuration or both.
+This ensures that the DAO can be upgraded without requiring consumers to upgrade their contracts,
+and remains flexible and resilient for the future.
+
+\begin{figure}
+    \centering
+    \includegraphics[width=0.35\textwidth]{figures/gov-init-stake.pdf}
+    \caption{Example UTxO flow for the initialization of a staked position.}
+    \label{fig:utxo-flow-gov-stake-init}
+\end{figure}
+
+\begin{figure}
+    \centering
+    \includegraphics[width=0.35\textwidth]{figures/init-gov-thread.pdf}
+    \caption{Example UTxO flow for the creation of a governance thread.}
+    \label{fig:utxo-flow-gov-thread-init}
+\end{figure}
+
+\begin{figure}
+    \centering
+    \includegraphics[width=0.35\textwidth]{figures/init-vote.pdf}
+    \caption{Example UTxO flow for the creation of a governance vote.}
+    \label{fig:utxo-flow-vote-init}
+\end{figure}
+
+\begin{figure}
+    \centering
+    \includegraphics[width=0.35\textwidth]{figures/upgrade-gov-thread.pdf}
+    \caption{Example UTxO flow for upgrading the governance thread.}
+    \label{fig:utxo-flow-gov-thread-upgrade}
+\end{figure}
+
+\subsection{Consumers}
+
+Consumers are any contracts that are parameterizable by the voting process or allow performing actions
+based on the outcome of a vote. Examples include:
+
+\begin{itemize}
+    \item \textbf{Treasury:} A treasury contract, which is a consumer of proposals of the Governance contract and distributes funds according to the outcome of the voting process.
+    \item \textbf{Pools:} The pools contracts allow changing parameters such as fees or upgrading entire pools based on tally results.
+    \item \textbf{Licenses:} The license NFTs for batchers and swappers can be minted only if a tally result has enough yes votes.
+\end{itemize}
+
+For effects, the datum of the tally result simply contains an arbitrary PlutusDatum.
+The consumer of the tally result can then interpret the datum and perform the desired effect.
+
+Pools can allow changing a variety of parameters, such as fees, stake keys, license policies or even the entire pool implementation.
+An example is depicted in \cref{fig:utxo-flow-params}.
+
+Licenses allow usage of a special kind of tally: The tally about whether a specific license should be minted
+is open, i.e. never closes due to the date. Users can add or remove their votes at any time.
+New license can then for example only be minted for a specific period of time after the current tally result has enough yes votes.
+This can be enforced by allowing a maximum amount of time after the earliest validity of a minting transaction.
+
+
 
 \section{Conclusion}
-\subsection{Summary of Findings}
-\subsection{Recommendations for Implementation}
+
+This document has presented a comprehensive analysis and framework for the implementation of the MuesliSwap On-Chain Governance platform on the Cardano blockchain. The design leverages a robust and transparent on-chain governance mechanism that enables MILK token holders to participate democratically in the decision-making processes of the MuesliSwap protocol. The platform's architecture is built on the principles of decentralization, security, efficiency, and user incentivization, ensuring a balanced and fair governance system.
+
+The detailed design and functional specifications outlined provide a clear roadmap for the development of the governance platform, emphasizing the importance of user accessibility, transparency, and security.
+The modular design approach allows for flexibility and scalability, adapting to evolving needs and integrating new functionalities over time.
+
+A comparative analysis of existing governance solutions highlights the unique strengths and potential areas of improvement in the on-chain governance landscape.
+The lessons learned from these analyses have been instrumental in shaping the design choices and strategic direction of the MuesliSwap On-Chain Governance platform
+and will give the MuesliSwap On-Chain governance unqiue and robust properties.
+
+The integration plan delineates a pragmatic approach to incorporating the new governance components with the existing off-chain governance infrastructure.
+This strategy ensures a seamless transition and enhances the overall governance experience for the MuesliSwap community.
+
+In conclusion, the MuesliSwap On-Chain Governance platform marks a significant advancement in blockchain governance, offering a robust, transparent, and democratic framework for protocol management.
+Its implementation will not only benefit the MuesliSwap community but also set a precedent for on-chain governance in the broader blockchain ecosystem.
+The platform's success will depend on continuous community engagement, feedback, and iterative improvements, ensuring that it remains responsive to the evolving needs and expectations of its stakeholders.
 
 \section{References}
 
