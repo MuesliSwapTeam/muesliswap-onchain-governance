@@ -87,8 +87,8 @@ This is to ensure that the contract can be upgraded in case of a bug or security
 relevant features.
 Rather than forcing every consumer to upgrade the consumed contract,
 the contract will allow moving the governance thread to a new contract version.
-The alternative would be to allow consumers to upgrade the governance contract which they track -
-which implies that for every upgrade of the governance contract, every consumer would have to be upgraded as well.
+The alternative would be to allow consumers to upgrade the Tally contract which they track -
+which implies that for every upgrade of the Tally contract, every consumer would have to be upgraded as well.
 This would be a major burden for consumers of the contract and can lead to security issues due to pending upgrades.
 
 To avoid double voting, it is necessary to lock governance tokens during the voting process.
@@ -100,7 +100,7 @@ use staked tokens for participation in the governance process, and other mechani
 \label{sec:architecture}
 
 The protocol consists of a set of smart contracts that are deployed on the Cardano blockchain.
-The main component is the \emph{Governance} contract, which is responsible for the overall governance process.
+The main component is the \emph{Tally} contract, which is responsible for the overall governance process.
 It is used to track submitted proposals by users and tally voting results.
 Users join the governance process by locking funds into the \emph{Staking} contract (see \cref{fig:utxo-flow-gov-stake-init}).
 The Staking contract tracks the tallies that the funds are participating in and ensures that
@@ -146,16 +146,16 @@ such as the MuesliSwap \emph{Pools} contract.
 
 \subsection{Protocol Parameter Update Interface}
 
-The result of the voting process will remain as an immutable tally result in the Governance contract
+The result of the voting process will remain as an immutable tally result in the Tally contract
 indefinitely.
 Thus it can be consumed by the protocol components as a reference UTxO to update their internal state accordingly.
-An example of the parameter updates that are possible through the Governance contract is the changing of pool swap fees
+An example of the parameter updates that are possible through the Tally contract is the changing of pool swap fees
 or changing its stake key.
 An example UTxO flow is depicted in \cref{fig:utxo-flow-params}.
 
 \begin{figure}
     \centering
-    \includegraphics[width=0.35\textwidth]{figures/pool-param-update.pdf}
+    \includegraphics[width=0.5\textwidth]{figures/pool-param-update.pdf}
     \caption{Example UTxO flow for a parameter update}
     \label{fig:utxo-flow-params}
 \end{figure}
@@ -164,7 +164,23 @@ An example UTxO flow is depicted in \cref{fig:utxo-flow-params}.
 
 The Treasury contract will be responsible for managing the funds of the MuesliSwap development treasury.
 For this, the result of the voting process will be consumed by the Treasury contract and the funds will be distributed accordingly.
-The resulting UTxO flow will be similar in nature to the parameter update, as depicted in \cref{fig:utxo-flow-params}.
+To allow parallel and contention-free deposits into the treasury, the treasury is split in two parts:
+The \emph{Treasurer} contract and the \emph{Value Store} contract.
+
+Deposits into the Value Store can be performed by any user.
+Deposits are accompanied by a datum that specifies the treasurer that is responsible for spending the funds.
+
+The Treasurer contract keeps track of which tally results have already been processed to prevent distributing funds multiple times.
+In a distribution transaction, it sums the funds spent from the Value Store and ensures that only what can be distributed according to the tally result is spent.
+The remaining funds are returned to the Value Store.
+The resulting UTxO flow is depicted in \cref{fig:utxo-flow-treasury}.
+
+\begin{figure}
+    \centering
+    \includegraphics[width=0.5\textwidth]{figures/spend-from-treasury.pdf}
+    \caption{Example UTxO flow for a treasury spending}
+    \label{fig:utxo-flow-treasury}
+\end{figure}
 
 \subsubsection{Functional Requirements}
 
@@ -334,6 +350,16 @@ Clarity DAO is a project focusing on providing DAO infrastructure to projects on
 The Clarity Protocol is built on top of Agora and does hence not require an additional investigation regarding protocol performance.
 
 
+\subsubsection{Indigo DAO}
+
+The Indigo DAO source code can be found on GitHub\footnote{\url{https://github.com/IndigoProtocol/indigo-smart-contracts/tree/main/src/Indigo/Contracts/Governance}}.
+According to the developers it supports sharding of vote tallies and compositional upgrades using minting policy ids to control the execution of governance results.
+It is not documented in detail however and further covered in this document.
+
+\subsubsection{Distributed Representation by Logical Mechanism}
+
+There is another GitHub repository featuring a DAO implementation for Cardano\footnote{\url{https://github.com/logicalmechanism/distributed_representation}}.
+However to our knowledge, it is not yet deployed on the Cardano blockchain and not well documented.
 
 \subsection{Governance Models on other Platforms}
 
@@ -436,7 +462,7 @@ The frontend can assist in the development of the backend by providing a user in
 Moreover the ability to submit transactions through the frontend will allow testing of the contracts in a realistic environment.
 
 Overall, the smart contract basics will be developed first.
-This includes the governance contract, the staking contract and the treasury contract.
+This includes the Tally contract, the staking contract and the treasury contract.
 The backend will then be developed to interact with the contracts.
 Finally, the frontend will be developed to interact with the backend.
 While there is this fundamental dependency between the components, the development of the components can be done in parallel and iteratively refined as the development progresses.
@@ -444,7 +470,7 @@ While there is this fundamental dependency between the components, the developme
 
 \section{Technical Details}
 
-This sections outlines concrete elements of the final implementation of the MuesliSwap On-Chain Governance platform,
+This sections outlines concrete elements of the final implementation of the MuesliSwap On-Chain Tally platform,
 as well as outlining the UTxO flow for a few more activities.
 
 \subsection{Main Components}
@@ -454,28 +480,31 @@ The implementation of the governance platform is designed with the following com
     \item \textbf{GovNFT:} A smart contract that allows minting of one-shot NFTs that have unique names ensured by hashing their input UTxO which is spent in the process.
     \item \textbf{AuthNFT:} A smart contract that allows minting of NFTs with the same name as a GovNFT, when a GovNFT is spent. This is used to authenticate tally results and should be tracked by consumers.
     \item \textbf{GovState:} The governance state contract tracks an initialized DAO configuration together with a unique, one-shot minted NFT, the GovNFT.
-    \item \textbf{Governance:} The governance contract tracks the current state of a proposal and allows for tallying votes.
+    \item \textbf{Tally:} The Tally contract tracks the current state of a proposal and allows for tallying votes.
     \item \textbf{Staking:} The staking contract locks funds for the duration of the voting process.
-    \item \textbf{Treasury:} A treasury contract, which is a consumer of proposals of the Governance contract and distributes funds according to the outcome of the voting process.
+    \item \textbf{Treasury:} A treasury contract, which is a consumer of proposals of the Tally contract and distributes funds according to the outcome of the voting process.
+    \item \textbf{VaultFT:} A fungible token contract, used to track funds locked in the MuesliSwap Vault and to allow delegating those funds to votes via the staking contract.
 \end{itemize}
 
-Note that consumers of the Governance contract can be any contract that is parameterizable by the voting process.
+Note that consumers of the Tally contract can be any contract that is parameterizable by the voting process.
 The important part is that the contract ensures that tally results are only valid if the AuthNFT is present and matches the expectation.
 While the GovNFT is the token of actual interest, it can not be replicated and hence can not accompany the tally result, which will be consumed by the consuming contract.
+Moreover, consumers need to ensure that a tally result can only be applied once by tracking the last applied proposal ID.
 
 To set up a DAO structure, a governance thread has to be initiated by minting a GovNFT.
-It is sent to the GovState contract, which is initialized with the DAO configuration.
+It is sent to the GovState contract, together with a datum that describes the the initial DAO configuration.
 The process is depicted in \cref{fig:utxo-flow-gov-thread-init}.
 
-The thread has to be consumed to create a vote on the Governance Contract, which is a proposal that can be voted on.
+The thread has to be consumed to create a vote on the Tally Contract, which is a proposal that can be voted on.
 The process for tally initiation is depicted in \cref{fig:utxo-flow-vote-init}.
-By consuming the thread and governance NFT, the GovState contract can control whether an AuthNFT can be minted which needs to accompany the tally result. 
 The general idea of how to update a tally result is presented in \cref{sec:architecture}.
 
-This ensures that it is enough for consumers to track the immutable AuthNFT to verify the tally result,
-while the GovState contract may be upgraded, as depicted in \cref{fig:utxo-flow-gov-thread-upgrade}.
+By consuming the thread and governance NFT, the GovState contract can control whether an AuthNFT can be minted which needs to accompany the tally result. 
+This ensures that it is enough for consumers to track the immutable AuthNFT to verify the final tally result.
+Tracking the governance thread address or tally address may be insufficient,
+as these contracts may be upgraded, as depicted in \cref{fig:utxo-flow-gov-thread-upgrade}.
 An upgrade may change the GovState contract, parameters in the thread i.e. the DAO configuration or both.
-This ensures that the DAO can be upgraded without requiring consumers to upgrade their contracts,
+The independence of AuthNFT/GovNFT and GovState and Tally ensures that the DAO can be upgraded without requiring consumers to upgrade their contracts,
 and remains flexible and resilient for the future.
 
 \begin{figure}
@@ -506,19 +535,67 @@ and remains flexible and resilient for the future.
     \label{fig:utxo-flow-gov-thread-upgrade}
 \end{figure}
 
+
+\subsection{What precisely does every contract control?}
+
+In order to check the validity of this modular contract, we outline below what abstractly every contract has to control so that overall safety is ensured.
+This is defined in a topological order such that we can rely on assumptions about what a previously defined contract controls.
+
+\begin{enumerate}
+    \item \textbf{GovNFT:} The GovNFT contract controls that a GovNFT can only be minted once and that the name of the GovNFT is unique.
+    \item \textbf{AuthNFT:} The AuthNFT contract controls that an AuthNFT can only be minted by unlocking a GovNFT $x$ and will have the same token name as $x$.
+    \item \textbf{VoteNFT:} The VoteNFT contract controls that a VoteNFT can only be minted by unlocking an AuthNFT. The policy id of the VoteNFT is unique to the AuthNFT and the token name is the id of the proposal.
+    \item \textbf{Staking:} The staking contract controls i) that funds are locked for the duration of the voting process where they participate in and ii) ensures that funds can only be withdrawn and moved by the owner. We consider transferring funds to another user as a violation to i). If an AuthNFT is unlocked, the contract allows removal of one element from the participations list.
+    \item \textbf{Tally:} The Tally contract controls that the datum of participating stake and the tally is correctly updated during a vote. Crucially, it also ensures that the voting stake can not participate twice in the vote.
+    We can assume that the staking contract ensures that a) the funds are locked for the duration of the voting process and b) that unlocking funds from the staking contract for a vote indicates the intent of the owner to participate.
+    Because the staking contract allows arbitrary changes to the datum that do not violate a) and b), in particular adding participation in a vote, it is necessary to control the presence of a valid VoteNFT when withdrawing votes from the tally and control its burning.
+    \item \textbf{GovState:} The GovState contract controls that i) a created tally in the Tally contract has the correct parameters and that the GovNFT and GovState is returned unchanged.
+    Moreover, it controls that ii) the GovState and GovNFT are moved to an address with the datum specified in a valid tally with an upgrade result.
+    A valid tally is a) a tally that has been closed and b) is accompanied by a valid AuthNFT.
+    \item \textbf{VaultFT:} The VaultFT contract controls that the amount of governance tokens locked in the MuesliSwap Vault is equal to the amount minted. Further the name of the token represents the time at which the funds are eligble for unlocking from the vault.
+\end{enumerate}
+
+\subsection{Addendum to the Staking Contracts}
+
+In the naive implementation, the staking contract would only allow the owner of the staking position to add or remove their vote from a tally.
+The problem that arises from this implementation is contention around the tally state when multiple users want to add or remove their vote,
+as the tally has to be consumed to allow changing ones vote.
+The solution to this is a delegation NFT that the owner of the staking position can mint and deposits into the staking position.
+This NFT allows a third party to spend the staking position for the exact purpose of adding or removing votes from a tally, as specified in the name
+of the delegation NFT.
+The name of the NFT is the blake2b hash of the redeemer of the staking position that describes the action that should be performed.
+This is conveniently the same hash that is used to hash and look up datums on chain and thus allows for a simple lookup of the delegation NFT meaning for third party batchers.
+
 \subsection{Consumers}
 
 Consumers are any contracts that are parameterizable by the voting process or allow performing actions
 based on the outcome of a vote. Examples include:
 
 \begin{itemize}
-    \item \textbf{Treasury:} A treasury contract, which is a consumer of proposals of the Governance contract and distributes funds according to the outcome of the voting process.
+    \item \textbf{Treasury:} A treasury contract, which is a consumer of proposals of the Tally contract and distributes funds according to the outcome of the voting process.
     \item \textbf{Pools:} The pools contracts allow changing parameters such as fees or upgrading entire pools based on tally results.
     \item \textbf{Licenses:} The license NFTs for batchers and swappers can be minted only if a tally result has enough yes votes.
 \end{itemize}
 
 For effects, the datum of the tally result simply contains an arbitrary PlutusDatum.
 The consumer of the tally result can then interpret the datum and perform the desired effect.
+To obtain the result of a tally a consumer contract should verify the following properties:
+\begin{itemize}
+    \item The AuthNFT is present and matches the expected value.
+    \item The proposal ID is strictly increasing compared to previously consumed tally results.
+    \item The winning vote passes the quorum.
+    \item The winning vote has the most votes of all possible choices
+    \item Depending on the usecase: The tally has been closed.
+\end{itemize}
+
+The treasury contract is a consumer of the Tally contract and distributes funds according to the outcome of the voting process.
+For this, it is split into two parts: The \emph{Treasurer} contract and the \emph{Value Store} contract.
+The Value Store contract is used to allow parallel and contention-free deposits into the treasury.
+Deposits into the Value Store can be performed by any user.
+Deposits are accompanied by a datum that specifies the treasurer that is responsible for spending the funds.
+The Treasurer contract keeps track of which tally results have already been processed to prevent distributing funds multiple times.
+In a distribution transaction, it sums the funds spent from the Value Store and ensures that only what can be distributed according to the tally result is spent.
+The tally result is a datum that specifies the receiver of the funds and the amount to be distributed.
 
 Pools can allow changing a variety of parameters, such as fees, stake keys, license policies or even the entire pool implementation.
 An example is depicted in \cref{fig:utxo-flow-params}.
@@ -527,6 +604,7 @@ Licenses allow usage of a special kind of tally: The tally about whether a speci
 is open, i.e. never closes due to the date. Users can add or remove their votes at any time.
 New license can then for example only be minted for a specific period of time after the current tally result has enough yes votes.
 This can be enforced by allowing a maximum amount of time after the earliest validity of a minting transaction.
+
 
 
 
