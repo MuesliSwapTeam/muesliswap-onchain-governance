@@ -1,3 +1,22 @@
+"""
+The staking vote NFT contract.
+This NFT authenticates that a staking position has participated in a tally.
+The purpose is to prevent removing votes from a tally without participating in the first place.
+
+This contract is intended to have inputs from these contracts:
+- staking/staking (1, indicating the stake participating in some tally)
+- tally/tally (1, indicating the tally in which the stake participates)
+
+Outputs of this contract may go to:
+- staking/staking (continuation of the above, this output will hold the minted NFT)
+- tally/tally (continuation of the above)
+
+NFTs that the outputs may hold:
+- staking/staking_vote_nft (previously minted plus the own minted one)
+- tally/tally_auth_nft (at the tally address)
+
+It is not allowed to mint several staking vote NFTs in a single transaction.
+"""
 from opshin.prelude import *
 from opshin.std.builtins import *
 

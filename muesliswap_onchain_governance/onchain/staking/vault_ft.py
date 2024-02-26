@@ -1,3 +1,18 @@
+"""
+The vault FT contract.
+This FT represents a single governance token locked into a staking vault until a fixed amount of time.
+
+This contract is intended to have inputs from these contracts:
+- the staking Vault contract (if minted for existing vault positions)
+
+
+Outputs of this contract may go to:
+- the staking vault contract (when minted for a new position)
+- any address (intended: user wallet, but no restriction is necessary)
+
+
+It is not allowed to mint several vault FTs with different names in a single transaction. It is allowed to mint several of the same name.
+"""
 from muesliswap_onchain_governance.onchain.staking.staking_util import *
 from opshin.std.math import *
 

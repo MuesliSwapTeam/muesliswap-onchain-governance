@@ -1,3 +1,27 @@
+"""
+The tally contract.
+
+This contract holds the current state of a tally. It interacts with the staking contract in order to add and retract
+its participation in the tally.
+
+This contract is intended to be have inputs from these contracts:
+- tally/tally: Maintaining the state of the tally votes
+- staking/staking: For tracking the addition or retraction of votes
+
+This contract is intended to have mints with these contracts:
+- staking/staking_vote_nft: For tracking the addition (resp. retraction) of participation in a tally by mint (resp. burn)
+
+Outputs of this contract may go to:
+- tally/tally (1 at most, continuation of the above)
+- staking/staking (1 at most, maintaining the state of participations, no value transfer should happen here)
+
+Relevant NFTs present at outputs of this contract:
+- staking/staking_vote_nft (authenticates a valid participation in the tally towards the tally contract)
+- staking/vault_ft (represents locked governance tokens)
+- tally/tally_auth_nft (1 at the output that goes to the tally and has previously been at the tally)
+
+It is not allowed to spend several tally states in a single transaction.
+"""
 from muesliswap_onchain_governance.onchain.staking.staking_util import *
 
 

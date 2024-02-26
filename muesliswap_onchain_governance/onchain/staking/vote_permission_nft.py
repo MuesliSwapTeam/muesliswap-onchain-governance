@@ -1,3 +1,19 @@
+"""
+The vote permission NFT contract.
+This NFT allows a third party to perform the addition or retraction of a participation in a vally
+for a staking position with a (potentially contended) tally UTxO
+
+This contract is intended to have inputs from these contracts:
+- Any (intended: staking/staking)
+
+Outputs of this contract may go to:
+- Any (intended: staking/staking (continuation of the above, this output will hold the minted NFT))
+
+NFTs that the outputs may hold:
+- staking/vote_permission_nft (previously minted plus the own minted one)
+
+It is not allowed to mint several vote permission NFTs in a single transaction.
+"""
 from muesliswap_onchain_governance.onchain.staking.staking_util import *
 
 

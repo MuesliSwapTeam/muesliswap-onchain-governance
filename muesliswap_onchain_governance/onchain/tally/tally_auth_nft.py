@@ -1,3 +1,19 @@
+"""
+The tally auth NFT contract.
+This NFT authenticates that a tally was minted from a specific governance thread.
+
+This contract is intended to have inputs from these contracts:
+- gov_state/gov_state (1, for indicating the governance thread that created this tally)
+
+Outputs of this contract may go to:
+- tally/tally (1, the created tally, note this is checked by the gov thread and not here)
+- gov_state/gov_state (1, continuation of the above)
+
+NFTs that the outputs may hold:
+- tally/tally_auth_nft (the minted one)
+
+It is not allowed to mint several tally auth NFTs in a single transaction.
+"""
 from opshin.prelude import *
 
 from muesliswap_onchain_governance.onchain.util import *

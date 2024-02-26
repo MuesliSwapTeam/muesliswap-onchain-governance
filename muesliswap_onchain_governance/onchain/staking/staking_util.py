@@ -1,3 +1,6 @@
+"""
+Utils for the staking contracts. This is not a contract.
+"""
 from muesliswap_onchain_governance.onchain.util import *
 from opshin.std.math import *
 

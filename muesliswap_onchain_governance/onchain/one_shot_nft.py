@@ -1,5 +1,7 @@
 """
 NFT with a unique name that can only be minted once.
+This contract is never directly used but instead the validator function is imported
+by subcontracts and parameterized at initialization (to prevent optimizing it away).
 """
 
 from opshin.prelude import *

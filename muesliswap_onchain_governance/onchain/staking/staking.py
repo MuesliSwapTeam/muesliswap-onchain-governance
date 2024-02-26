@@ -1,3 +1,30 @@
+"""
+The staking contract.
+
+This contract holds governance tokens (i.e. MILK) and vault FT tokens that represent
+locked governance tokens. It tracks participation in tallies and releases these tokens
+only when they are not participating in a tally anymore.
+
+This contract is intended to be have inputs from these contracts:
+- staking/staking (1 at most, maintaining the state of participations)
+- tally/tally: For tracking the retraction of participation in a tally
+
+This contract is intended to have mints with these contracts:
+- staking/staking_vote_nft: For tracking the addition of participation in a tally
+
+Outputs of this contract may go to:
+- staking/staking (1 at most, continuation of the above)
+- the owner of the staking position (for withdrawing funds)
+- tally/tally (1 at most, maintaining the tally state, no value transfer should happen to this address)
+
+NFTs present at outputs of this contract:
+- staking/staking_vote_nft (authenticates a valid participation in the tally towards the tally contract)
+- staking/vault_ft (represents locked governance tokens)
+- staking/vote_permission_nft (permits a third party to execute an addition or retraction of tally participation, i.e. votes)
+- tally/tally_auth_nft (1 at the output that goes to the tally and has previously been at the tally)
+
+It is not allowed to spend several staking states in a single transaction.
+"""
 from muesliswap_onchain_governance.onchain.staking.staking_util import *
 
 
@@ -103,12 +130,12 @@ def check_enough_governance_tokens_in_output(
     ), "Removed too many gov tokens"
 
 
-def check_extract_max_1_ada(
+def check_extract_max_2_ada(
     previous_state_input: TxOut, next_state_output: TxOut
 ) -> None:
     prev_value = previous_state_input.value
     next_value = next_state_output.value
-    prev_value_minus_one_ada = subtract_value(prev_value, {b"": {b"": 1_000_000}})
+    prev_value_minus_one_ada = subtract_value(prev_value, {b"": {b"": 2_000_000}})
     check_greater_or_equal_value(next_value, prev_value_minus_one_ada)
 
 
@@ -160,7 +187,7 @@ def validator(
         desired_next_state, next_state_output, tx_info.valid_range
     )
     if not owner_controls_tx:
-        # check that the executor may take a maximum of 1 ada from the output
-        check_extract_max_1_ada(previous_state_input, next_state_output)
+        # check that the executor may take a maximum of 2 ada from the output
+        check_extract_max_2_ada(previous_state_input, next_state_output)
     # check that the staking state is not made too large accidentally
     check_output_reasonably_sized(next_state_output, next_state)

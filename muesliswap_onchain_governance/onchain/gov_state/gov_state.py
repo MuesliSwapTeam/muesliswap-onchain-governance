@@ -1,3 +1,26 @@
+"""
+The governance state contract.
+This contract maintains the state of a governance thread and allows for the creation of new tally proposals.
+A governance thread is authenticated by the presence of a governance nft along the UTxO holding the state as datum.
+
+This contract is intended to have mints with these contracts:
+- tally/tally_auth_nft: Mints 1 matching the attached Governance State NFT during Tally Creation
+
+Outputs of this contract may go to:
+- tally/tally (1 at most for the creation of new tally states)
+- gov_state/gov_state (1 at most for the creation of new tally states)
+- Any upgraded governance state contract (1 at most for the upgrade of the governance state contract)
+
+NFTs present at outputs of this contract:
+- tally/tally_auth_nft (1 at most for the created tally)
+- gov_state/gov_state_nft (1 at most for the continuing output)
+
+Reference inputs:
+- tally/tally (any number for referencing a winning proposal that indicates a governance upgrade)
+
+It is not allowed to spend several governance states in a single transaction.
+"""
+
 from muesliswap_onchain_governance.onchain.util import *
 
 

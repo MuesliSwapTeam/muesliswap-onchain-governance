@@ -1,6 +1,27 @@
 """
-Consumer of the tally states.
-Releases specified funds to the specified address if the tally is successful.
+The value store contract.
+
+This contract maintains funds of the treasury.
+The funds are controlled by a state at treasury/treasurer.
+
+This contract is intended to be have inputs from these contracts:
+- treasury/treasurer (1, the previous state)
+- treasury/value_store (n, storing funds handled by the treasurer)
+
+This contract is intended to have mints with these contracts:
+- None
+
+Outputs of this contract may go to:
+- treasury/treasurer (1, continuation of above)
+- treasury/value_store (<= n, storing remaining funds not paid out in this transaction)
+
+Relevant NFTs present at outputs of this contract:
+- treasury/treasurer_nft (1, authenticates the treasurer thread akin to the governance thread)
+
+Reference inputs:
+- tally/tally (1, referencing a winning proposal that indicates a governance upgrade)
+
+It is allowed to spend as many value_store inputs as one can fit into a single transaction.
 """
 
 

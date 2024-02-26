@@ -1,8 +1,22 @@
 """
+The license NFT contract.
+
 Consumer of the tally states.
 Releases license with limited validity to the specified address if the tally is successful.
 Tallys are expected to have infinite validity and do not need to be finished for releasing licenses.
 However the quorum must be reached.
+
+Outputs of this contract may go to:
+- The winning address of the referenced address in the winning tally
+
+Reference inputs:
+- tally/tally (1, referencing a winning proposal that indicates a governance upgrade)
+
+NFTs that the outputs may hold:
+- licenses/licenses (previously minted plus the own minted one)
+
+It is not allowed to mint several license NFTs with distinct names in a single transaction but well allowed to mint
+several licenses of the same name (i.e. expiry date).
 """
 from opshin.std.math import *
 from muesliswap_onchain_governance.onchain.util import *
