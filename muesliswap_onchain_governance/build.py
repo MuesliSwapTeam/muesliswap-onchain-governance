@@ -28,6 +28,11 @@ from muesliswap_onchain_governance.onchain.treasury import (
     treasurer_nft,
 )
 from muesliswap_onchain_governance.onchain.licenses import licenses
+from muesliswap_onchain_governance.onchain.simple_pool import (
+    pool_nft,
+    simple_pool,
+    lp_token,
+)
 
 
 def build_compressed(
@@ -83,6 +88,12 @@ def main(
     vault_admin_key: str = "vault_admin",
     governance_token: str = "afbe91c0b44b3040e360057bf8354ead8c49c4979ae6ab7c4fbdc9eb.4d494c4b7632",
 ):
+    build_compressed("spending", simple_pool.__file__)
+    for script in (
+        pool_nft,
+        lp_token,
+    ):
+        build_compressed("minting", script.__file__)
     vault_contract_address = to_address(
         pycardano.Address.from_primitive(vault_contract_address)
     )

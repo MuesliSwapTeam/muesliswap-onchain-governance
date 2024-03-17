@@ -15,6 +15,10 @@ The following subdirectories are present:
 
 - `onchain`: Contains the code for the on-chain part of the governance system i.e. Smart Contracts written in OpShin
 - `offchain`: Contains the code for the off-chain part of the governance system i.e. building and submitting transactions for interaction with the Smart Contracts
+- `api`: Contains code for the REST API that provides information about the governance system
+    - `chain_querier`: Contains the code for querying the blockchain for information about the governance system and tracking the current state of the system in a database
+    - `db_querier`: Contains the code for querying data from the database to prepare it for the REST API
+    - `server`: Contains the code for the server that supplies information about the governance system via a REST API
 
 ### Operating the DAO
 
@@ -72,6 +76,18 @@ For this you need to first initialize the treasury (again for convenience update
 python3 -m muesliswap_onchain_governance.offchain.treasury.init --wallet creator
 python3 -m muesliswap_onchain_governance.offchain.treasury.deposit --wallet creator
 python3 -m muesliswap_onchain_governance.offchain.treasury.payout --wallet voter
+```
+
+### Upgrading a liquidity pool
+
+The DAO can also be used to upgrade a liquidity pool. For this, you need to create a new liquidity pool and a proposal to upgrade the liquidity pool.
+The following commands will create a new liquidity pool and a proposal to upgrade the liquidity pool.
+
+```bash
+python3 -m muesliswap_onchain_governance.offchain.simple_pool.init --wallet creator
+python3 -m muesliswap_onchain_governance.offchain.gov_state.create_tally --wallet creator
+python3 -m muesliswap_onchain_governance.offchain.tally.add_vote_tally --wallet voter --proposal_index 3
+python3 -m muesliswap_onchain_governance.offchain.simple_pool.upgrade --wallet voter
 ```
 
 [1]: [DAO Treasury & Protocol Parameter Management via On-Chain Governance - By MuesliSwap](https://projectcatalyst.io/funds/10/f10-daos-less3-cardano/dao-treasury-and-protocol-parameter-management-via-on-chain-governance-by-muesliswap)

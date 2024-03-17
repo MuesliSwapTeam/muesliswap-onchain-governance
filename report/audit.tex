@@ -1,0 +1,238 @@
+
+\documentclass[11pt]{article}
+\usepackage[utf8]{inputenc}
+\usepackage{geometry}
+\usepackage{graphicx}
+\usepackage{hyperref}
+\usepackage{amsmath}
+\usepackage{amsfonts}
+\usepackage{amssymb}
+\usepackage{color}
+\usepackage[capitalise,noabbrev]{cleveref}
+\usepackage{caption}
+\usepackage{subcaption}
+\geometry{a4paper}
+
+\title{MuesliSwap Internal Audit Report}
+\author{MuesliSwapTeam}
+\date{\today}
+
+\usepackage{biblatex}
+\addbibresource{references.bib}
+
+
+\begin{document}
+
+\maketitle
+% \newpage
+% \tableofcontents
+% \newpage
+
+\section{Introduction}
+\subsection{Background}
+MuesliSwap is a decentralized exchange (DEX) built on the Cardano blockchain.
+It is designed to provide a secure, transparent, and efficient platform for users to trade digital assets.
+The team behind MuesliSwap is committed to fostering a decentralized and inclusive ecosystem, where users have a say in the development and governance of the protocol.
+This lead to the development of the MuesliSwap Off-Chain Governance platform, which allows users to submit and vote on proposals regarding the MuesliSwap protocol.
+The next step is to develop an on-chain governance platform that allows for enforceable on-chain effects of the voting process.
+A draft version of the platform has been developed in OpShin, a domain-specific language for smart contracts on the Cardano blockchain based on Python.
+This ensure maximum maintainability and readability of the code.
+Nontheless, before the platform is deployed on the Cardano blockchain, it is crucial to conduct a comprehensive audit to ensure the security, reliability, and efficiency of the platform.
+In a first step, a seperated part of the team has preformed an independent audit of the code which is presented in this document.
+
+\subsection{Purpose of the Document}
+The purpose of this document is to provide a detailed audit report of the MuesliSwap On-Chain Governance platform.
+This includes discovered vulnerabilities, potential security threats, and recommendations for improving the security and reliability of the platform.
+The document is made availabile to the public to ensure transparency and to provide a comprehensive overview of the audit process and its outcomes.
+The document is purely informative and does not constitute financial or investment advice nor does it promise or guarantee the absence of bugs
+or complete faithfulness of the analyzed code.
+
+\subsection{Scope}
+The scope of this document entails a list of discovered vulnerabilities and potential security threats in the MuesliSwap On-Chain Governance platform.
+Moreover it includes recommendations for improving the security and reliability of the platform.
+
+\section{Audit Methodology}
+The audit was conducted by a team of experienced blockchain developers and security experts.
+The audit process involved a comprehensive review of the MuesliSwap On-Chain Governance platform's codebase, focusing on the following key areas:
+
+\begin{itemize}
+    \item Smart contract architecture and design
+    \item Code quality and readability
+    \item Security vulnerabilities and potential attack vectors
+    \item Compliance with best practices and industry standards
+    \item CPU and Mem optimization and efficiency
+\end{itemize}
+
+The audit process was conducted in accordance with industry best practices and security standards.
+The team utilized a combination of manual code review and automated analysis tools to identify potential vulnerabilities and security threats.
+
+\section{Audit Findings}
+
+\subsection{Excessive Script Output Sizes}
+
+\paragraph{Issue Identification}
+It was identified that there was no existing mechanism to ensure the size of assets and the attached data (datum) within script continuations remained within reasonable limits. The absence of such a check posed a potential vulnerability, risking system stability and security.
+
+\paragraph{Issue Description}
+The primary concern revolved around excessively large script outputs, which could lead to inefficient operation of the on-chain governance mechanisms and possibly expose the system to various attacks. The issue is known as \textit{UTXO Value Size Spam AKA Token Dust Attack} \cite{CommonVuls}.
+
+\paragraph{Resolution}
+The resolution to this issue was swiftly implemented with a commit (\texttt{df7449e}) on the same day the issue was reported. The commit introduced a simple, yet effective function designed to check the maximum size of script outputs before their execution. This function serves as a preventative measure, ensuring all script continuations adhere to predefined size constraints, thereby mitigating the risk previously identified.
+
+
+\subsection{Inadequate Validation in New Tally Function}
+
+\paragraph{Issue Identification}
+It was discovered that the \texttt{validate\_new\_tally} function lacked a crucial validation step to ensure that exactly one output represents a new tally.
+This oversight could potentially allow the creation of multiple tallies simultaneously, which poses a significant risk to the integrity of the tally creation process.
+
+\paragraph{Issue Description}
+The core issue was identified and concerns the absence of a validation mechanism in the \texttt{validate\_new\_tally} function to verify the creation of only one new tally as an output.
+The existing implementation did not prevent the possibility of generating multiple tallies in the same transaction.
+This situation could lead to only the tally specified in the redeemer being validated, thus potentially overlooking additional unauthorized tallies.
+This flaw was noted as a critical oversight that could undermine the system's security and operational integrity.
+
+\paragraph{Suggested Resolution}
+The suggested resolution, involves incorporating an explicit check within the \texttt{validate\_new\_tally} function.
+This check would confirm that exactly one output is dedicated to a new tally, thereby safeguarding against the creation of multiple tallies.
+Furthermore, it was highlighted that a tally's validity is indirectly ensured by the requirement of an accompanying authorization NFT, which guarantees that only one NFT can be minted per transaction.
+Despite this indirect safeguard, the consensus was that an explicit check would offer a more robust solution.
+This improvement was promptly addressed by commit (\texttt{0b655aa}), effectively closing the issue and reinforcing the system's validation process.
+
+\subsection{Unintended Tally Creation in Governance State Update}
+
+\paragraph{Issue Identification}
+A potential vulnerability was identified in the \texttt{muesliswap-onchain-governance} project, related to the \texttt{UpdateGovState} redeemer.
+It was discovered that during the process of updating the government state, there is an opportunity to create arbitrary new tallies.
+This behavior may not be intentional and could lead to unintended consequences affecting the control and integrity of the tally creation process.
+
+\paragraph{Issue Description}
+The core issue lies in the ability to potentially exploit the \texttt{UpdateGovState} redeemer to create new tallies arbitrarily while updating the government state.
+This functionality raises significant concerns regarding:
+\begin{itemize}
+    \item \textbf{Integrity of Tally Creation:} Allowing the creation of new tallies in this manner might undermine the controls or checks designed around the tally creation process.
+    \item \textbf{Unexpected State Changes:} The unintended functionality could result in unexpected state changes. These changes might not be immediately noticeable but could impact the system's stability and reliability over time.
+\end{itemize}
+
+\paragraph{Resolution}
+Upon the issue being raised it was acknowledged as a vulnerability.
+The problem was addressed and resolved by a commit (\texttt{4feb091}) on the day the issue was reported.
+The resolution involved:
+\begin{itemize}
+    \item \textbf{Clarification:} A clear explanation was provided, acknowledging the unintended functionality as a vulnerability.
+    \item \textbf{Review and Testing:} The code was reviewed, and additional testing was conducted to ensure that arbitrary tally creation through the \texttt{UpdateGovState} redeemer is no longer possible, safeguarding the system's integrity and reliability.
+\end{itemize}
+This corrective action ensures the robustness and reliability of the system by eliminating the vulnerability related to unintended tally creation.
+
+\subsection{Duplicate Voting Vulnerability}
+
+\paragraph{Issue Identification}
+An examination of the voting mechanism within the system raised concerns regarding the prevention of duplicate votes by a single user.
+Specifically, the focus was on the possibility of a user invoking the \texttt{AddVote} function multiple times with the same stake, potentially leading to multiple participations in the same election.
+This scenario highlights a significant vulnerability that compromises the integrity of the voting process.
+
+\paragraph{Issue Description}
+The core of the issue lies in the lack of mechanisms within both the staking and tally contracts to ensure that a stake is not counted more than once in an election.
+The current system only ensures that stake is locked in the resulting position after a vote is cast, without validating that a staking update is performed or preventing multiple participations by the same stake in a single vote.
+This oversight opens the door to the possibility of \textit{Duplicate Voting}, undermining the fairness and integrity of the election process.
+
+\paragraph{Resolution}
+The vulnerability was acknowledged and addressed by a series of comments and a subsequent commit (\texttt{b62b7d4}).
+The proposed solution involves enhancing the staking contract to include the necessary validations for staking updates and to enforce the invariant that prevents multiple participations by the same stake in an election.
+This approach ensures that each stakeholder is limited to one vote per election, reinstating the intended democratic integrity of the voting mechanism.
+The issue was marked as resolved upon the implementation of these changes.
+
+\subsection{Potential Spam Attack on Tally}
+
+\paragraph{Issue Identification}
+An issue was raised regarding a potential vulnerability in the tally system.
+The concern was that users could add spam tokens to vote updates, which in turn could increase the size of the tally beyond 1000 bytes.
+This could potentially exploit the system by attaching an excessive number of tokens or reference scripts to manipulate the tally mechanism.
+
+\paragraph{Issue Description}
+The vulnerability identified revolves around the ability to manipulate the tally by adding spam tokens, potentially leading to a situation where the vote integer's size could prevent the system from progressing.
+
+\paragraph{Discussion and Resolution}
+Upon further discussion and analysis it was found that this issue might not be as critical as initially thought.
+The tally contract is designed to allow the removal of attached funds, meaning that if additional tokens are added, they can be removed in a subsequent transaction.
+This mechanism not only addresses the potential vulnerability but also provides an incentive for participants to remove spam tokens by obtaining them as a reward.
+Consequently, this issue was marked as completed and closed.
+
+\subsection{Inability to Burn Vote NFTs}
+
+\paragraph{Issue Identification}
+It was discovered that the logic for minting vote NFTs lacked a clear pathway for validating the burning process.
+This oversight could potentially lead to issues with governance token management and the integrity of the voting process, as it prevents the proper removal of vote NFTs from circulation.
+
+\paragraph{Issue Description}
+The core of the problem lies in the absence of a mechanism within the vote NFT minting logic to validate or execute the burning of these tokens.
+This limitation not only restricts the flexibility needed in the management of vote NFTs but also poses a risk to the governance system's operational efficiency and security.
+The inability to burn vote NFTs could result in an inflated or inaccurate representation of voting power, undermining the governance framework's reliability.
+
+\paragraph{Resolution}
+The issue was addressed and resolved through a commit (\texttt{daba559}), the same day the issue was reported.
+The resolution involved implementing a solution that introduced the necessary logic to validate and execute the burning of vote NFTs. This enhancement ensures that the governance framework can accurately reflect the current distribution of voting power by allowing for the removal of vote NFTs from circulation, thereby maintaining the integrity and accuracy of the voting process.
+
+
+\paragraph{Conclusion}
+The proactive identification and discussion of potential vulnerabilities within the muesliswap-onchain-governance system demonstrate the community's commitment to maintaining the security and efficiency of its operations. The resolution of this issue underscores the importance of having flexible and robust mechanisms in place to mitigate potential attacks and ensure the integrity of the governance process.
+
+\subsection{Unrestricted Amount of Licenses Per Winning Vote}
+
+\paragraph{Issue Identification}
+An issue was discovered where there was no mechanism to restrict the number of licenses that could be minted from a successful vote tally.
+This oversight could potentially lead to the unlimited distribution of licenses, raising concerns about system integrity and the possibility of abuse.
+
+\paragraph{Issue Description}
+The issue centers around the governance mechanism's inability to limit the issuance of licenses following a vote.
+Specifically, there was no validation to ensure that only a predetermined number of licenses could be minted, allowing for an unrestricted amount to be issued.
+This could undermine the intended scarcity and exclusivity of certain licenses, such as batcher licenses, and possibly lead to unintended distribution or use scenarios.
+
+\paragraph{Discussion and Resolution Approach}
+The discussion on this issue was led by contributors.
+It was debated whether the lack of restriction was problematic, with considerations on the potential for tracking licenses back to the original recipient and penalizing undesired behavior.
+The possibility of implementing a minting governor to restrict license issuance was discussed but deemed not necessarily desirable due to the flexibility needed for different batcher implementations and the potential requirement for a new policy ID for changes in license rules.
+Finally the issue was closed as completed without implementing a direct solution to restrict license minting, focusing instead on oversight and potential penalization for misuse.
+For example, licenses do now contain a unique identifier that can be used to track the original recipient and revoke access to future licenses in case of misuse.
+
+\paragraph{Resolution}
+The issue was ultimately considered not to be a significant concern, given the control mechanisms in place for managing license misuse through the revocation of access to future licenses. The consensus was that the flexibility for license receivers to manage their licenses, including potential distribution, was acceptable within the governance framework's context. The issue was closed by \textit{pcjordan} as completed without implementing a direct solution to restrict license minting, focusing instead on oversight and potential penalization for misuse.
+
+\paragraph{Comments and Further Actions}
+Further discussions might explore alternative approaches to ensure the governance system's integrity while maintaining flexibility for license distribution and management. Any significant changes to the license issuance rules would require careful consideration of the impact on policy IDs and the adaptability of pool contracts to dynamically update allowed batcher policies based on tally results.
+
+
+\subsection{Potential Tally Spamming}
+
+\paragraph{Issue Identification}
+An issue was opened concerning the absence of a fee for creating tally proposals muesliswap-onchain-governance project.
+The current protocol does not require any fee beyond the network fee for proposal creation.
+This oversight could potentially allow for protocol spamming through the creation of numerous unnecessary proposals.
+
+\paragraph{Issue Description}
+The primary issue lies in the fact that creating a tally proposal is cost-free, aside from the network fee, which does not deter the submission of frivolous or malicious proposals.
+The suggested resolution involves introducing a proposal creation fee in governance tokens, which would be directed to the treasury.
+This approach necessitates that the governance contract is aware of the treasury's location, implying the need for an upgrade to the governance thread whenever there is a change in the treasury's address.
+
+\paragraph{Proposed Resolution}
+The proposed solution entails the introduction of a fee for creating tally proposals, payable in governance tokens.
+This fee structure aims to prevent spam by imposing a cost on the submission of proposals, ensuring that only serious and considered proposals are submitted.
+Implementing this fee requires the governance contract to be updated to recognize the treasury's location, highlighting the need for flexibility in the governance system's design to accommodate changes in treasury management.
+A direct implementation has not been performed, yet as it is unclear whether this does actually improve the situation
+and the upsides outweigh the significant downside of reduced participation in the governance process.
+
+
+\section{Conclusion}
+
+The audit of the MuesliSwap On-Chain Governance platform identified several vulnerabilities and potential security threats.
+The team behind the platform promptly addressed these issues and implemented the necessary changes to mitigate the risks and reinforce the system's security and reliability.
+The audit process also provided valuable insights and recommendations for improving the platform's security and efficiency.
+The team's proactive approach to addressing the identified vulnerabilities demonstrates their commitment to maintaining a secure and transparent governance platform.
+The audit process has been instrumental in identifying and resolving potential security threats, thereby enhancing the overall security and reliability of the MuesliSwap On-Chain Governance platform.
+
+
+\section{References}
+
+\printbibliography
+
+\end{document}

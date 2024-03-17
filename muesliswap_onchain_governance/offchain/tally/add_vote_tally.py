@@ -30,13 +30,13 @@ from ..util import (
 from muesliswap_onchain_governance.onchain.tally import tally, tally_auth_nft
 from muesliswap_onchain_governance.onchain.staking import staking_vote_nft, staking
 from ...utils import get_signing_info, ogmios_url, network, kupo_url
-from ...utils.contracts import get_contract, module_name
+from ...utils.contracts import get_contract, module_name, get_ref_utxo
 
 
 def main(
     wallet: str = "creator",
-    proposal_id: int = 3,
-    proposal_index: int = 2,
+    proposal_id: int = 1,
+    proposal_index: int = 3,
     tally_auth_nft_tk_name: str = GOV_STATE_NFT_TK_NAME,
 ):
     # Load script info
@@ -45,11 +45,13 @@ def main(
         _,
         tally_address,
     ) = get_contract(module_name(tally), True)
+    tally_script = get_ref_utxo(tally_script, context) or tally_script
     (
         staking_script,
         _,
         staking_address,
     ) = get_contract(module_name(staking), True)
+    staking_script = get_ref_utxo(staking_script, context) or staking_script
     (
         staking_vote_nft_script,
         staking_vote_nft_policy_id,

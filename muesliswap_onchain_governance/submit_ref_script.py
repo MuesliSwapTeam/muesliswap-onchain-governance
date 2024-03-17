@@ -5,6 +5,7 @@ import fire
 from pycardano import TransactionBuilder, TransactionOutput, min_lovelace, Value
 
 from muesliswap_onchain_governance.onchain.licenses import licenses
+from muesliswap_onchain_governance.onchain.simple_pool import simple_pool
 from muesliswap_onchain_governance.onchain.treasury import (
     treasurer,
     treasurer_nft,
@@ -31,16 +32,17 @@ def main(compress: bool = True):
     )
 
     for contract in [
+        simple_pool,
+        tally,
+        tally_auth_nft,
+        staking_vote_nft,
+        staking,
         treasurer,
         value_store,
         licenses,
         treasurer_nft,
         gov_state_nft,
         gov_state,
-        tally,
-        tally_auth_nft,
-        staking_vote_nft,
-        staking,
         vote_permission_nft,
         vault_ft,
     ]:

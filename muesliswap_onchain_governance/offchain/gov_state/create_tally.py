@@ -4,6 +4,9 @@ import fire
 import pycardano
 
 from muesliswap_onchain_governance.onchain.licenses import licenses
+from muesliswap_onchain_governance.onchain.simple_pool import (
+    classes as simple_pool_classes,
+)
 from muesliswap_onchain_governance.onchain.staking import vault_ft
 from muesliswap_onchain_governance.onchain.treasury import treasurer
 from muesliswap_onchain_governance.utils.network import show_tx, context
@@ -134,7 +137,7 @@ def main(
             multi_asset=asset_from_token(auth_nft_tk, 1),
         ),
         datum=tally.TallyState(
-            votes=[0, 0, 0],
+            votes=[0, 0, 0, 0],
             params=tally.ProposalParams(
                 quorum=prev_gov_state_datum.params.min_quorum,
                 proposals=[
@@ -150,7 +153,12 @@ def main(
                     licenses.LicenseReleaseParams(
                         address=to_address(treasury_benefactor),
                         datum=NoOutputDatum(),
-                        future_validity=1000000000,
+                        maximum_future_validity=1000000000,
+                    ),
+                    simple_pool_classes.PoolUpgradeParams(
+                        old_pool_nft=tally.Nothing(),
+                        new_pool_params=tally.Nothing(),
+                        new_pool_address=to_address(payment_address),
                     ),
                 ],
                 end_time=tally.FinitePOSIXTime(
@@ -180,6 +188,7 @@ def main(
         )
     )
     builder.ttl = context.last_block_slot + 100
+    builder.fee_buffer = 1000
 
     # Sign the transaction
     signed_tx = builder.build_and_sign(

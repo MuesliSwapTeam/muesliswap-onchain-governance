@@ -123,6 +123,18 @@ def check_mint_exactly_one_with_name(
     check_mint_exactly_n_with_name(mint, 1, policy_id, required_token_name)
 
 
+def check_mint_exactly_nothing(
+    mint: Value, policy_id: PolicyId, token_name: TokenName
+) -> None:
+    """
+    Check that exactly no token with the given policy and name is minted
+    """
+    for pid, tokens in mint.items():
+        if pid == policy_id:
+            for tn, _ in tokens.items():
+                assert tn != token_name, "No token of this name must be minted"
+
+
 def token_present_in_output(token: Token, output: TxOut) -> bool:
     """
     Returns whether the given token is contained in the output
@@ -408,3 +420,10 @@ def total_value(value_store_inputs: List[TxOut]) -> Value:
     for txo in value_store_inputs:
         total_value = add_value(total_value, txo.value)
     return total_value
+
+
+def amount_of_token_in_value(
+    token: Token,
+    value: Value,
+) -> int:
+    return value.get(token.policy_id, {b"": 0}).get(token.token_name, 0)

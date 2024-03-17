@@ -6,6 +6,11 @@ Releases license with limited validity to the specified address if the tally is 
 Tallys are expected to have infinite validity and do not need to be finished for releasing licenses.
 However the quorum must be reached.
 
+The license name is structured as follows:
+- The first 3 bytes are the id of the winning tally in big-endian, left-padded with 0s
+- The remaining bytes are the expiry date of the license in POSIX time, milliseconds, big-endian.
+  They may be left-padded with 0s but do not have to be.
+
 Outputs of this contract may go to:
 - The winning address of the referenced address in the winning tally
 
@@ -41,8 +46,30 @@ class LicenseReleaseParams(PlutusData):
     CONSTR_ID = 101
     address: Address
     datum: OutputDatum
-    # how long into the future the license is valid
-    future_validity: POSIXTime
+    # how long into the future the license is valid from a mint in milliseconds
+    maximum_future_validity: POSIXTime
+
+
+def check_valid_license_name(
+    license_name: TokenName,
+    proposal_id: ProposalId,
+    transaction_validity_lower_bound: ExtendedPOSIXTime,
+    maximum_future_validity: int,
+) -> None:
+    # check that the license has a valid name
+    # - first 3 bytes are the id of the winning tally in big-endian
+    # - remaining bytes are the expiry date of the license in POSIX time, milliseconds, big-endian
+    license_tally_id = unsigned_int_from_bytes_big(license_name[:3])
+    assert license_tally_id == proposal_id
+
+    license_posix = unsigned_int_from_bytes_big(license_name[3:32])
+    assert isinstance(
+        transaction_validity_lower_bound, FinitePOSIXTime
+    ), "Transaction validity lower bound must be finite"
+    latest_allowed_license_posix = (
+        transaction_validity_lower_bound.time + maximum_future_validity
+    )
+    assert license_posix <= latest_allowed_license_posix, "License minted too late"
 
 
 def validator(
@@ -77,13 +104,10 @@ def validator(
         total_amount_sent_out == minted_amount
     ), "License not released to the specified address with specified datum"
 
-    # check that the license has a valid name (not minted too late)
-    license_posix = unsigned_int_from_bytes_big(redeemer.license_name)
-    transaction_validity_posix = tx_info.valid_range.lower_bound.limit
-    assert isinstance(
-        transaction_validity_posix, FinitePOSIXTime
-    ), "Transaction validity lower bound must be finite"
-    latest_allowed_license_posix = (
-        transaction_validity_posix.time + winning_tally_params.future_validity
-    )
-    assert license_posix <= latest_allowed_license_posix, "License minted too late"
+    # check that the license has a valid name
+    check_valid_license_name(
+        redeemer.license_name,
+        winning_tally.proposal_id,
+        tx_info.valid_range.lower_bound.limit,
+        winning_tally_params.maximum_future_validity,
+    ), "Invalid license name (either too long validity or wrong proposal id)"
