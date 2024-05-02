@@ -4,6 +4,7 @@ import fire
 import pycardano
 
 from muesliswap_onchain_governance.onchain.tally.tally import BoxedInt
+from muesliswap_onchain_governance.onchain.util import reduced_proposal_params
 from muesliswap_onchain_governance.utils.network import show_tx, context
 from muesliswap_onchain_governance.utils.to_script_context import to_address
 from opshin.ledger.api_v2 import PosInfPOSIXTime
@@ -150,11 +151,9 @@ def main(
 
     # generate redeemer for the staking
     participation = staking.Participation(
-        tally_auth_nft=tally_auth_nft_tk,
-        proposal_id=proposal_id,
+        tally_params=reduced_proposal_params(prev_tally_datum.params),
         weight=voting_power,
         proposal_index=proposal_index,
-        end_time=prev_tally_datum.params.end_time,
     )
     staking_redeemer = Redeemer(
         staking.AddVote(
@@ -183,7 +182,7 @@ def main(
     staking_vote_nft_name = staking_vote_nft.staking_vote_nft_name(
         proposal_index,
         voting_power,
-        prev_tally_datum.params,
+        reduced_proposal_params(prev_tally_datum.params),
     )
     staking_vote_nft_tk = Token(
         staking_vote_nft_policy_id.payload, staking_vote_nft_name
@@ -200,7 +199,7 @@ def main(
     builder.add_script_input(staking_utxo, staking_script, None, staking_redeemer)
 
     builder.add_minting_script(
-        staking_vote_nft_script,
+        get_ref_utxo(staking_vote_nft_script, context) or staking_vote_nft_script,
         staking_vote_nft_redeemer,
     )
     builder.mint = asset_from_token(staking_vote_nft_tk, 1)
@@ -232,6 +231,7 @@ def main(
     context.submit_tx(signed_tx)
 
     show_tx(signed_tx)
+    return signed_tx, new_tally_datum
 
 
 if __name__ == "__main__":

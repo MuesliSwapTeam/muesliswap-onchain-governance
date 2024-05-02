@@ -1,4 +1,5 @@
 import datetime
+from typing import Tuple
 
 import fire
 import pycardano
@@ -34,30 +35,34 @@ from ..util import (
 from muesliswap_onchain_governance.onchain.tally import tally_auth_nft, tally
 from muesliswap_onchain_governance.onchain.gov_state import gov_state, gov_state_nft
 from ...utils import get_signing_info, ogmios_url, network, kupo_url, get_address
-from ...utils.contracts import get_contract, module_name
+from ...utils.contracts import get_contract, module_name, get_ref_utxo
 
 
 def main(
     wallet: str = "creator",
     gov_state_nft_tk_name: str = GOV_STATE_NFT_TK_NAME,
     treasury_benefactor: str = "voter",
-):
+    tally_state_cbor: str = None,
+) -> Tuple[pycardano.Transaction, tally.TallyState]:
     # Load script info
     (
         gov_state_script,
         _,
         gov_state_address,
     ) = get_contract(module_name(gov_state), True)
+    gov_state_script_ref_utxo = get_ref_utxo(gov_state_script, context)
     (
         tally_script,
         _,
         tally_address,
     ) = get_contract(module_name(tally), True)
+    tally_script_ref_utxo = get_ref_utxo(tally_script, context)
     (
         tally_auth_nft_script,
         tally_auth_nft_policy_id,
         _,
     ) = get_contract(module_name(tally_auth_nft), True)
+    tally_auth_nft_script_ref_utxo = get_ref_utxo(tally_auth_nft_script, context)
     (_, gov_state_nft_policy_id, _) = get_contract(module_name(gov_state_nft), True)
     (_, vault_ft_policy_id, _) = get_contract(module_name(vault_ft), True)
 
@@ -118,10 +123,15 @@ def main(
     )
     for u in payment_utxos:
         builder.add_input(u)
-    builder.add_script_input(gov_state_utxo, gov_state_script, None, gov_state_redeemer)
+    builder.add_script_input(
+        gov_state_utxo,
+        gov_state_script_ref_utxo or gov_state_script,
+        None,
+        gov_state_redeemer,
+    )
 
     builder.add_minting_script(
-        tally_auth_nft_script,
+        tally_auth_nft_script_ref_utxo or tally_auth_nft_script,
         Redeemer(
             tally_auth_nft.AuthRedeemer(
                 spent_utxo_index=gov_state_input_index,
@@ -130,13 +140,10 @@ def main(
         ),
     )
     builder.mint = asset_from_token(auth_nft_tk, 1)
-    tally_output = TransactionOutput(
-        address=tally_address,
-        amount=Value(
-            coin=2000000,
-            multi_asset=asset_from_token(auth_nft_tk, 1),
-        ),
-        datum=tally.TallyState(
+    if tally_state_cbor:
+        tally_state = tally.TallyState.from_cbor(tally_state_cbor)
+    else:
+        tally_state = tally.TallyState(
             votes=[0, 0, 0, 0],
             params=tally.ProposalParams(
                 quorum=prev_gov_state_datum.params.min_quorum,
@@ -175,8 +182,16 @@ def main(
                 staking_vote_nft_policy=new_gov_state_datum.params.staking_vote_nft_policy,
                 staking_address=new_gov_state_datum.params.staking_address,
                 governance_token=new_gov_state_datum.params.governance_token,
+                winning_threshold=new_gov_state_datum.params.min_winning_threshold,
             ),
+        )
+    tally_output = TransactionOutput(
+        address=tally_address,
+        amount=Value(
+            coin=2000000,
+            multi_asset=asset_from_token(auth_nft_tk, 1),
         ),
+        datum=tally_state,
     )
 
     builder.add_output(with_min_lovelace(tally_output, context))
@@ -187,7 +202,7 @@ def main(
             datum=new_gov_state_datum,
         )
     )
-    builder.ttl = context.last_block_slot + 100
+    builder.ttl = context.last_block_slot + 20
     builder.fee_buffer = 1000
 
     # Sign the transaction
@@ -200,6 +215,8 @@ def main(
     context.submit_tx(signed_tx)
 
     show_tx(signed_tx)
+
+    return signed_tx, tally_state
 
 
 if __name__ == "__main__":

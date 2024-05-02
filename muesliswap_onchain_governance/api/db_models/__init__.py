@@ -1,0 +1,80 @@
+from .db import (
+    Block,
+    Address,
+    Datum,
+    Token,
+    Transaction,
+    TransactionOutput,
+    TransactionOutputValue,
+    sqlite_db,
+)
+from .gov_state import GovState, GovParams, GovUpgrade, TrackedGovStates
+from .tally_state import (
+    TallyState,
+    TallyProposals,
+    TallyParams,
+    TallyWeights,
+    TallyVote,
+    TallyCreation,
+    TallyCreationParticipants,
+)
+from .treasury import (
+    TreasurerParams,
+    TreasurerState,
+    ValueStoreState,
+    TreasuryDelta,
+    TreasuryDeltaValue,
+    TrackedTreasuryStates,
+    TreasuryPayout,
+)
+from .staking import (
+    StakingState,
+    StakingParams,
+    StakingParticipation,
+    VotePermission,
+    StakingDeposit,
+    StakingParticipationInStaking,
+    VotePermissionMint,
+    StakingDepositDelta,
+    StakingDepositParticipationAdded,
+    StakingDepositParticipationRemoved,
+)
+
+sqlite_db.connect()
+sqlite_db.create_tables(
+    [
+        Block,
+        Address,
+        Datum,
+        Token,
+        Transaction,
+        TransactionOutput,
+        TransactionOutputValue,
+        GovParams,
+        GovState,
+        GovUpgrade,
+        TallyState,
+        TallyParams,
+        TallyProposals,
+        TallyWeights,
+        TallyCreation,
+        TallyCreationParticipants,
+        TallyVote,
+        TreasurerParams,
+        TreasurerState,
+        TreasuryDelta,
+        TreasuryDeltaValue,
+        TreasuryPayout,
+        ValueStoreState,
+        StakingParams,
+        StakingState,
+        StakingParticipation,
+        StakingDeposit,
+        StakingDepositDelta,
+        StakingDepositParticipationAdded,
+        StakingDepositParticipationRemoved,
+        StakingParticipationInStaking,
+        VotePermission,
+        VotePermissionMint,
+    ]
+)

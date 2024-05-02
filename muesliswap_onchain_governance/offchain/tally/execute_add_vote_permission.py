@@ -4,13 +4,14 @@ import fire
 import pycardano
 
 from muesliswap_onchain_governance.onchain.tally.tally import BoxedInt
+from muesliswap_onchain_governance.onchain.util import reduced_proposal_params
 from muesliswap_onchain_governance.utils.network import (
     show_tx,
     blockfrost_client,
     context,
 )
 from muesliswap_onchain_governance.utils.to_script_context import to_address
-from opshin.prelude import Token
+from opshin.prelude import Token, Nothing
 from pycardano import (
     OgmiosChainContext,
     TransactionBuilder,
@@ -41,12 +42,17 @@ from muesliswap_onchain_governance.utils import (
     network,
     kupo_url,
 )
-from muesliswap_onchain_governance.utils.contracts import get_contract, module_name
+from muesliswap_onchain_governance.utils.contracts import (
+    get_contract,
+    module_name,
+    get_ref_utxo,
+)
 import blockfrost
 
 
 def main(
     wallet: str = "creator",
+    vote_permission_cbor_hex: str = None,
 ):
     # Load script info
     (
@@ -54,16 +60,19 @@ def main(
         _,
         tally_address,
     ) = get_contract(module_name(tally), True)
+    tally_script_ref_utxo = get_ref_utxo(tally_script, context)
     (
         staking_script,
         _,
         staking_address,
     ) = get_contract(module_name(staking), True)
+    staking_script_ref_utxo = get_ref_utxo(staking_script, context)
     (
         staking_vote_nft_script,
         staking_vote_nft_policy_id,
         _,
     ) = get_contract(module_name(staking_vote_nft), True)
+    staking_vote_nft_ref_utxo = get_ref_utxo(staking_vote_nft_script, context)
     (
         _,
         tally_auth_nft_policy_id,
@@ -74,6 +83,7 @@ def main(
         vote_permission_nft_policy_id,
         _,
     ) = get_contract(module_name(vote_permission_nft), True)
+    vote_permission_nft_ref_utxo = get_ref_utxo(vote_permission_nft_script, context)
 
     # Get payment address
     payment_vkey, payment_skey, payment_address = get_signing_info(
@@ -107,18 +117,23 @@ def main(
         )[0].payload,
     )
     # We can simply look this up because the token name is the same as the datum hash of the redeemer during minting - it is hence known to most indexers
-    vote_permission_raw_cbor = blockfrost_client.script_datum_cbor(
-        vote_permission_nft_tk.token_name.hex()
-    ).cbor
+    if vote_permission_cbor_hex is None:
+        vote_permission_raw_cbor = blockfrost_client.script_datum_cbor(
+            vote_permission_nft_tk.token_name.hex()
+        ).cbor
+    else:
+        vote_permission_raw_cbor = bytes.fromhex(vote_permission_cbor_hex)
     vote_permission = vote_permission_nft.VotePermissionNFTParams.from_cbor(
         vote_permission_raw_cbor
     )
     assert isinstance(
         vote_permission.redeemer, vote_permission_nft.DelegatedAddVote
     ), "Only add vote permissions are supported by this script"
-    proposal_id = vote_permission.redeemer.participation.proposal_id
+    proposal_id = vote_permission.redeemer.participation.tally_params.proposal_id
 
-    tally_auth_nft_tk = vote_permission.redeemer.participation.tally_auth_nft
+    tally_auth_nft_tk = (
+        vote_permission.redeemer.participation.tally_params.tally_auth_nft
+    )
     # Select tally
     tally_utxos = context.utxos(tally_address)
     tally_utxo = None
@@ -191,11 +206,12 @@ def main(
     staking_vote_nft_name = staking_vote_nft.staking_vote_nft_name(
         proposal_index,
         voting_power,
-        prev_tally_datum.params,
+        reduced_proposal_params(prev_tally_datum.params),
     )
     staking_vote_nft_tk = Token(
         staking_vote_nft_policy_id.payload, staking_vote_nft_name
     )
+    vote_permission_nft_redeemer = Redeemer(Nothing())
 
     # Build the transaction
     builder = TransactionBuilder(context)
@@ -206,14 +222,24 @@ def main(
     )
     for u in payment_utxos:
         builder.add_input(u)
-    builder.add_script_input(tally_utxo, tally_script, None, tally_redeemer)
-    builder.add_script_input(staking_utxo, staking_script, None, staking_redeemer)
+    builder.add_script_input(
+        tally_utxo, tally_script_ref_utxo or tally_script, None, tally_redeemer
+    )
+    builder.add_script_input(
+        staking_utxo, staking_script_ref_utxo or staking_script, None, staking_redeemer
+    )
 
     builder.add_minting_script(
-        staking_vote_nft_script,
+        staking_vote_nft_ref_utxo or staking_vote_nft_script,
         staking_vote_nft_redeemer,
     )
-    builder.mint = asset_from_token(staking_vote_nft_tk, 1)
+    builder.add_minting_script(
+        vote_permission_nft_ref_utxo or vote_permission_nft_script,
+        vote_permission_nft_redeemer,
+    )
+    builder.mint = asset_from_token(staking_vote_nft_tk, 1) + asset_from_token(
+        vote_permission_nft_tk, -1
+    )
     tally_output = TransactionOutput(
         address=tally_address,
         amount=tally_utxo.output.amount,
@@ -225,7 +251,8 @@ def main(
             pycardano.TransactionOutput(
                 address=staking_address,
                 amount=staking_utxo.output.amount
-                + Value(multi_asset=asset_from_token(staking_vote_nft_tk, 1)),
+                + Value(multi_asset=asset_from_token(staking_vote_nft_tk, 1))
+                - Value(multi_asset=asset_from_token(vote_permission_nft_tk, 1)),
                 datum=new_staking_datum,
             ),
             context,
@@ -242,6 +269,7 @@ def main(
     context.submit_tx(signed_tx)
 
     show_tx(signed_tx)
+    return signed_tx
 
 
 if __name__ == "__main__":

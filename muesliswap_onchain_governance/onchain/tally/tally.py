@@ -124,11 +124,9 @@ def translate_to_participation(
     redeemer: TallyAction, tally_state: TallyState
 ) -> Participation:
     return Participation(
-        tally_state.params.tally_auth_nft,
-        tally_state.params.proposal_id,
+        reduced_proposal_params(tally_state.params),
         redeemer.weight,
         redeemer.proposal_index,
-        tally_state.params.end_time,
     )
 
 
@@ -206,12 +204,13 @@ def check_valid_staking_update(
             previous_tally_state,
         )
         # Ensure that the stake does not already participate in the vote
+        own_reduced_params = reduced_proposal_params(previous_tally_state.params)
         assert (
             len(
                 [
                     p
                     for p in previous_staking_state.participations
-                    if p.proposal_id == previous_tally_state.params.proposal_id
+                    if p.tally_params == own_reduced_params
                 ]
             )
             == 0
@@ -228,7 +227,7 @@ def check_valid_staking_update(
         check_correct_staking_vote_nft_mint(
             redeemer.proposal_index,
             redeemer.weight,
-            previous_tally_state,
+            previous_tally_state.params,
             tx_info,
             next_staking_state_output,
         )
@@ -297,20 +296,28 @@ def check_valid_tally_update(
         tally.params.tally_auth_nft, next_tally_output
     ), "Auth NFT missing from given output"
     check_output_reasonably_sized(next_tally_output, next_tally_state)
+    # Note: tallies only check that the tally auth nft is attached and otherwise do not enforce any preservation of values.
+    # This effectively means that spamming with additional tokens is not possible because the next transaction can freely
+    # withdraw the tokens and remove them from the state
 
 
-def resolve_staking_output(
+def resolve_linear_staking_output(
     tx_info: TxInfo, staking_output_index: int, tally: TallyState
 ) -> TxOut:
     """
     Resolve the staking output that is referenced by the redeemer.
     Ensures that the staking output is at the staking address.
+    Ensures that no other staking outputs are present.
     """
 
     next_staking_state_output = tx_info.outputs[staking_output_index]
     assert (
         next_staking_state_output.address == tally.params.staking_address
     ), "Staking output is not at the staking address"
+    assert (
+        len([o for o in tx_info.outputs if o.address == tally.params.staking_address])
+        == 1
+    ), "More than one staking output"
     return next_staking_state_output
 
 
@@ -338,7 +345,20 @@ def validator(tally: TallyState, redeemer: TallyAction, context: ScriptContext) 
     )
     next_tally_state = resolve_linear_output_state(next_tally_state_output, tx_info)
 
-    next_staking_state_output = resolve_staking_output(
+    # Ensure that at most one staking input is present so that no additional staking positions
+    # can improperly retract votes (0 inputs is ok, this is a staking creation upon vote)
+    assert (
+        len(
+            [
+                o
+                for o in tx_info.inputs
+                if o.resolved.address == tally.params.staking_address
+            ]
+        )
+        <= 1
+    ), "More than one staking input"
+    # There should also not be more than one staking output for the same reason
+    next_staking_state_output = resolve_linear_staking_output(
         tx_info, redeemer.staking_output_index, tally
     )
     next_staking_state = resolve_staking_output_state(

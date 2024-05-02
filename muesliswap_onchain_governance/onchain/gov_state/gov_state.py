@@ -36,6 +36,7 @@ class GovStateParams(PlutusData):
     governance_token: Token
     vault_ft_policy: PolicyId
     min_quorum: int
+    min_winning_threshold: Fraction
     min_proposal_duration: POSIXTime
     gov_state_nft: Token
     tally_auth_nft_policy: PolicyId
@@ -191,6 +192,7 @@ def validate_new_tally(
     ), "Gov state must not change except for the last_proposal_id"
     check_output_reasonably_sized(next_gov_state_output, next_gov_state)
     # ensure that no tokens are being removed from the gov state
+    # and no tokens are added except for the existing ones (only ada increase is ok)
     check_preserves_value(input, next_gov_state_output)
     # ensure that the new tally is created at the correct address
     # and no other tally is created
@@ -198,36 +200,47 @@ def validate_new_tally(
         tx_info, redeemer.tally_output_index, params
     )
     # ensure that the new tally has an auth nft (and only one)
-    assert token_present_in_output(
-        tally_auth_nft, tally_output
-    ), f"AuthNFT missing from given output"
+    # and that no further token is minted (this duplicates some tally auth nft logic just to be safe)
+    check_mint_exactly_one_to_address(tx_info.mint, tally_auth_nft, tally_output)
     # ensure that the tally state is correct
     tally_state: TallyState = resolve_datum_unsafe(tally_output, tx_info)
-    assert tally_state.params.quorum >= params.min_quorum, "Quorum too low"
+
+    # ensure that the tally output is not too large
+    # note that additional funds can be added but subsequently withdrawn in an AddVote transaction
+    check_output_reasonably_sized(tally_output, tally_state)
+
+    tally_state_params = tally_state.params
+    assert tally_state_params.quorum >= params.min_quorum, "Quorum too low"
+    assert ge_fraction(
+        tally_state_params.winning_threshold, params.min_winning_threshold
+    ), "Winning threshold too low"
     tx_validity_end = tx_info.valid_range.upper_bound.limit
     assert ext_after_ext(
-        tally_state.params.end_time,
+        tally_state_params.end_time,
         add_milliseconds_to_extended_posix_time(
             tx_validity_end, params.min_proposal_duration
         ),
     ), "Proposal duration too short or validity end too late"
-    assert tally_state.params.proposal_id == new_proposal_id, "Proposal ID incorrect"
+    assert tally_state_params.proposal_id == new_proposal_id, "Proposal ID incorrect"
     assert (
-        tally_state.params.tally_auth_nft == tally_auth_nft
+        tally_state_params.tally_auth_nft == tally_auth_nft
     ), "AuthNFT must be the same as in the gov state"
     assert (
-        tally_state.params.staking_vote_nft_policy == params.staking_vote_nft_policy
+        tally_state_params.staking_vote_nft_policy == params.staking_vote_nft_policy
     ), "VoteNFT policy must be the same as in the gov state"
     assert (
-        tally_state.params.staking_address == params.staking_address
+        tally_state_params.staking_address == params.staking_address
     ), "Staking address must be the same as in the gov state"
     assert (
-        tally_state.params.governance_token == params.governance_token
+        tally_state_params.governance_token == params.governance_token
     ), "Governance token must be the same as in the gov state"
     assert (
-        tally_state.params.vault_ft_policy == params.vault_ft_policy
+        tally_state_params.vault_ft_policy == params.vault_ft_policy
     ), "Vault FT policy must be the same as in the gov state"
 
+    assert (
+        tally_state_params.proposals[0] == Nothing()
+    ), "Tally must offer a No-Op proposal as the first proposal"
     assert all(
         [v == 0 for v in tally_state.votes]
     ), "Tally state must not have any votes"
@@ -251,10 +264,12 @@ def validate_update_gov_state(
         redeemer.tally_input_index,
         Token(params.tally_auth_nft_policy, params.gov_state_nft.token_name),
         tx_info,
-        state.last_proposal_id,
+        state.params.latest_applied_proposal_id,
         True,
     )
     winning_proposal: GovStateUpdateParams = tally_result.winning_proposal
+    # check that the winning proposal is actually a gov state update
+    check_integrity(winning_proposal)
     # the winning proposal is the params and address for the new gov state
     # check that the new gov state is correct
     desired_new_gov_state = GovStateDatum(
@@ -270,14 +285,16 @@ def validate_update_gov_state(
         desired_new_gov_state == new_gov_state
     ), "Gov state must be updated to the winning proposal"
 
-    # check that the value is preserved and not too many tokens are attached
+    # check that the value is preserved and no additional tokens are attached
+    # the only possible addition is ada
     check_preserves_value(gov_state_input, new_gov_state_output)
     check_output_reasonably_sized(new_gov_state_output, new_gov_state)
 
-    # check that no tally is being created in this transaction
+    # check that no tally auth nft is minted during this transaction
     assert (
-        len([o for o in tx_info.outputs if o.address == params.tally_address]) == 0
-    ), "Invalid output to the tally address"
+        len(tx_info.mint.get(state.params.tally_auth_nft_policy, EMTPY_TOKENNAME_DICT))
+        == 0
+    ), "No AuthNFTs must be minted during this transaction"
 
 
 def resolve_linear_input_state(datum: GovStateDatum) -> GovStateDatum:

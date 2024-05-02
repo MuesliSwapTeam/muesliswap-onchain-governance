@@ -10,6 +10,8 @@ from uplc.ast import PlutusByteString, plutus_cbor_dumps
 import pycardano
 from opshin.ledger.api_v2 import FinitePOSIXTime
 from opshin.prelude import Token
+
+from muesliswap_onchain_governance.onchain import free_mint
 from .utils.to_script_context import to_address
 from .utils.contracts import get_contract, module_name
 from .utils.keys import get_address
@@ -50,14 +52,19 @@ def build_compressed(
         *args,
         "--recursion-limit",
         "2000",
+        "-O2",
     ]
-    subprocess.run(command)
+    subprocess.run(command, check=True)
 
     built_contract = Path(f"build/{script.stem}/script.cbor")
     built_contract_compressed_cbor = Path(f"build/tmp.cbor")
 
     with built_contract_compressed_cbor.open("wb") as fp:
-        subprocess.run(["plutonomy-cli", built_contract, "--default"], stdout=fp)
+        subprocess.run(
+            ["aiken", "uplc", "shrink", built_contract, "--cbor", "--hex"],
+            stdout=fp,
+            check=True,
+        )
 
     subprocess.run(
         [
@@ -83,10 +90,11 @@ def token_from_token_string(token: str) -> Token:
 def main(
     vault_contract_address: str = "addr1wyz9gd2m8y3q9ev5ee6tut6llxhxf34vp7a5tjm8d7q83gsu6r426",
     latest_vault_ft_mint_posix_time: int = int(
-        (datetime.datetime.now() + datetime.timedelta(days=300)).timestamp()
+        datetime.datetime(2024, 6, 30).timestamp()
     ),
     vault_admin_key: str = "vault_admin",
-    governance_token: str = "afbe91c0b44b3040e360057bf8354ead8c49c4979ae6ab7c4fbdc9eb.4d494c4b7632",
+    old_governance_token: str = "8a1cfae21368b8bebbbed9800fec304e95cce39a2a57dc35e2e3ebaa.4d494c4b",
+    new_governance_token: str = "afbe91c0b44b3040e360057bf8354ead8c49c4979ae6ab7c4fbdc9eb.4d494c4b7632",
 ):
     build_compressed("spending", simple_pool.__file__)
     for script in (
@@ -99,7 +107,8 @@ def main(
     )
     latest_existing_mint_time = latest_vault_ft_mint_posix_time * 1000
     vault_admin = get_address(vault_admin_key).payment_part.payload
-    governance_token = token_from_token_string(governance_token)
+    old_governance_token = token_from_token_string(old_governance_token)
+    new_governance_token = token_from_token_string(new_governance_token)
     build_compressed(
         "minting",
         vault_ft.__file__,
@@ -107,7 +116,8 @@ def main(
             vault_contract_address.to_cbor().hex(),
             FinitePOSIXTime(latest_existing_mint_time).to_cbor().hex(),
             plutus_cbor_dumps(vault_admin).hex(),
-            governance_token.to_cbor().hex(),
+            old_governance_token.to_cbor().hex(),
+            new_governance_token.to_cbor().hex(),
         ],
     )
 
@@ -118,6 +128,7 @@ def main(
         (gov_state, "spending"),
         (vote_permission_nft, "minting"),
         (tally, "spending"),
+        (free_mint, "minting"),
     ):
         build_compressed(purpose, script.__file__)
 

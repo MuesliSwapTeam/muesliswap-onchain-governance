@@ -16,6 +16,7 @@ class UpgradeablePoolParams(PlutusData):
     CONSTR_ID = 0
     fee: Fraction
     auth_nft: Token
+    license_policy_id: PolicyId
     last_applied_proposal_id: ProposalId
 
 

@@ -26,6 +26,7 @@ from ..util import (
     asset_from_token,
     with_min_lovelace,
     TREASURER_STATE_NFT_TK_NAME,
+    value_from_token,
 )
 from muesliswap_onchain_governance.onchain.staking import (
     staking_vote_nft,
@@ -42,11 +43,11 @@ from ...utils.to_script_context import to_address, to_tx_out_ref
 def main(
     wallet: str = "creator",
     treasurer_nft_token_name: str = TREASURER_STATE_NFT_TK_NAME,
-    amount: int = 2_000_000,
     number_of_outputs: int = 50,
-    governance_token: str = "bd976e131cfc3956b806967b06530e48c20ed5498b46a5eb836b61c2.744d494c4b",
+    deposit_token: str = "bd976e131cfc3956b806967b06530e48c20ed5498b46a5eb836b61c2.744d494c4b",
+    deposit_amount: int = 2000,
 ):
-    governance_token = token_from_string(governance_token)
+    deposit_token = token_from_string(deposit_token)
     # Load script info
     (
         treasurer_nft_script,
@@ -91,13 +92,13 @@ def main(
     builder.add_input(unique_utxo)
     builder.add_input_address(payment_address)
     for _ in range(number_of_outputs):
-        output = TransactionOutput(
-            address=value_store_address,
-            amount=Value(
-                coin=amount,
-                multi_asset=asset_from_token(governance_token, amount=1),
+        output = with_min_lovelace(
+            TransactionOutput(
+                address=value_store_address,
+                amount=value_from_token(deposit_token, deposit_amount),
+                datum=value_store_datum,
             ),
-            datum=value_store_datum,
+            context,
         )
         builder.add_output(output)
 
@@ -111,6 +112,7 @@ def main(
     context.submit_tx(signed_tx)
 
     show_tx(signed_tx)
+    return signed_tx
 
 
 if __name__ == "__main__":

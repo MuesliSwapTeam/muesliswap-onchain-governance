@@ -99,7 +99,7 @@ def construct_desired_output_staking_state(
         desired_next_state_participation = [
             p
             for p in previous_state.participations
-            if not vote_has_ended(p.end_time, tx_info.valid_range)
+            if not vote_has_ended(p.tally_params.end_time, tx_info.valid_range)
         ]
     elif isinstance(redeemer, WithdrawFunds) or isinstance(redeemer, AddFunds):
         desired_next_state_participation = previous_state.participations
@@ -163,6 +163,49 @@ def vote_permission_nft_token_name(
     return blake2b_256(params.to_cbor())
 
 
+@dataclass
+class Weight(PlutusData):
+    valid_until: int
+    weight: int
+
+
+def variable_governance_weight_in_output_list(
+    output: TxOut,
+    vault_ft_policy: PolicyId,
+) -> List[Weight]:
+    """
+    Returns a list of how much valid governance tokens are in the output and until when they are valid
+    """
+    valid_vault_tokens: List[Weight] = []
+    for tokenname, amount in output.value.get(
+        vault_ft_policy, EMTPY_TOKENNAME_DICT
+    ).items():
+        valid_vault_tokens = [
+            Weight(unsigned_int_from_bytes_big(tokenname), amount)
+        ] + valid_vault_tokens
+    return valid_vault_tokens
+
+
+def variable_governance_weight_in_output(
+    output: TxOut,
+    vault_ft_policy: PolicyId,
+    tally_end: ExtendedPOSIXTime,
+) -> int:
+    """
+    Returns the weight of variable governance tokens in the output (vault ft tokens)
+    based on vault ft tokens that are valid at the tally end time
+    """
+    valid_vault_tokens = 0
+    if isinstance(tally_end, FinitePOSIXTime):
+        tally_end_time = tally_end.time
+        for tokenname, amount in output.value.get(
+            vault_ft_policy, EMTPY_TOKENNAME_DICT
+        ).items():
+            if unsigned_int_from_bytes_big(tokenname) <= tally_end_time:
+                valid_vault_tokens += amount
+    return valid_vault_tokens
+
+
 def governance_weight_in_output(
     output: TxOut,
     governance_token: Token,
@@ -174,12 +217,7 @@ def governance_weight_in_output(
     and also adds the weight of the governance tokens that are locked in the vault and will be unlocked after the end of the tally
     """
     governance_token_amount = amount_of_token_in_output(governance_token, output)
-    valid_vault_tokens = 0
-    if isinstance(tally_end, FinitePOSIXTime):
-        tally_end_time = tally_end.time
-        for tokenname, amount in output.value.get(
-            vault_ft_policy, EMTPY_TOKENNAME_DICT
-        ).items():
-            if unsigned_int_from_bytes_big(tokenname) <= tally_end_time:
-                valid_vault_tokens += amount
-    return governance_token_amount + valid_vault_tokens
+    vault_ft_token_amount = variable_governance_weight_in_output(
+        output, vault_ft_policy, tally_end
+    )
+    return governance_token_amount + vault_ft_token_amount

@@ -11,6 +11,6 @@ def create_license_name(proposal_id: int, license_validity: int) -> bytes:
     :param license_validity:
     :return:
     """
-    return proposal_id.to_bytes(3, "big") + (license_validity).to_bytes(
+    return proposal_id.to_bytes(16, "big") + (license_validity).to_bytes(
         byte_length(license_validity), "big"
     )

@@ -1,9 +1,12 @@
+from fractions import Fraction
+
 import fire
 
 from muesliswap_onchain_governance.utils.network import show_tx, context
 from opshin.ledger.api_v2 import (
     POSIXTime,
 )
+from opshin.std.fractions import Fraction as OnchainFraction
 from opshin.prelude import Token
 from pycardano import (
     OgmiosChainContext,
@@ -30,14 +33,18 @@ from muesliswap_onchain_governance.onchain.tally import tally_auth_nft, tally
 from muesliswap_onchain_governance.onchain.gov_state import gov_state_nft, gov_state
 from ...utils import get_signing_info, ogmios_url, network, kupo_url
 from ...utils.contracts import get_contract, get_ref_utxo, module_name
-from ...utils.to_script_context import to_address, to_tx_out_ref
+from ...utils.to_script_context import to_address, to_tx_out_ref, to_fraction
+
+(_, vault_ft_policy_id, _) = get_contract(module_name(vault_ft), True)
 
 
 def main(
     wallet: str = "creator",
     governance_token: str = "bd976e131cfc3956b806967b06530e48c20ed5498b46a5eb836b61c2.744d494c4b",
     min_quorum: int = 1000,
+    min_winning_threshold: Fraction = Fraction(1, 4),
     min_proposal_duration: POSIXTime = 1000,
+    vault_ft_policy_id: bytes = vault_ft_policy_id.payload,
 ):
     governance_token = token_from_string(governance_token)
     # Load script info
@@ -72,7 +79,6 @@ def main(
         staking_policy_id,
         staking_address,
     ) = get_contract(module_name(staking), True)
-    (_, vault_ft_policy_id, _) = get_contract(module_name(vault_ft), True)
 
     # Get payment address
     payment_vkey, payment_skey, payment_address = get_signing_info(
@@ -99,8 +105,9 @@ def main(
             tally_address=to_address(tally_address),
             staking_address=to_address(staking_address),
             governance_token=governance_token,
-            vault_ft_policy=vault_ft_policy_id.payload,
+            vault_ft_policy=vault_ft_policy_id,
             min_quorum=min_quorum,
+            min_winning_threshold=to_fraction(min_winning_threshold),
             min_proposal_duration=min_proposal_duration,
             gov_state_nft=gov_nft_token,
             tally_auth_nft_policy=tally_auth_nft_policy_id.payload,
@@ -149,6 +156,8 @@ def main(
     print(f"Created governance thread with gov_nft_name: {gov_nft_name.hex()}")
 
     show_tx(signed_tx)
+
+    return signed_tx, gov_nft_name.hex()
 
 
 if __name__ == "__main__":

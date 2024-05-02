@@ -1,0 +1,361 @@
+{
+  "$schema": "https://cips.cardano.org/cips/cip57/schemas/plutus-blueprint.json",
+  "$id": "https://github.com/aiken-lang/aiken/blob/main/examples/hello_world/plutus.json",
+  "$vocabulary": {
+    "https://json-schema.org/draft/2020-12/vocab/core": true,
+    "https://json-schema.org/draft/2020-12/vocab/applicator": true,
+    "https://json-schema.org/draft/2020-12/vocab/validation": true,
+    "https://cips.cardano.org/cips/cip57": true
+  },
+  "preamble": {
+    "version": "1.0.0",
+    "plutusVersion": "v2",
+    "description": "opshin 0.21.1 Smart Contract",
+    "title": "validator"
+  },
+  "validators": [
+    {
+      "title": "validator",
+      "redeemer": {
+        "title": "redeemer",
+        "purpose": {
+          "oneOf": [
+            "mint"
+          ]
+        },
+        "schema": {
+          "anyOf": [
+            {
+              "dataType": "constructor",
+              "index": 1,
+              "fields": [
+                {
+                  "dataType": "constructor",
+                  "index": 0,
+                  "fields": [
+                    {
+                      "anyOf": [
+                        {
+                          "dataType": "constructor",
+                          "index": 0,
+                          "fields": [
+                            {
+                              "dataType": "bytes",
+                              "title": "credential_hash"
+                            }
+                          ],
+                          "title": "PubKeyCredential"
+                        },
+                        {
+                          "dataType": "constructor",
+                          "index": 1,
+                          "fields": [
+                            {
+                              "dataType": "bytes",
+                              "title": "credential_hash"
+                            }
+                          ],
+                          "title": "ScriptCredential"
+                        }
+                      ],
+                      "title": "payment_credential"
+                    },
+                    {
+                      "anyOf": [
+                        {
+                          "dataType": "constructor",
+                          "index": 1,
+                          "fields": [],
+                          "title": "NoStakingCredential"
+                        },
+                        {
+                          "dataType": "constructor",
+                          "index": 0,
+                          "fields": [
+                            {
+                              "anyOf": [
+                                {
+                                  "dataType": "constructor",
+                                  "index": 0,
+                                  "fields": [
+                                    {
+                                      "anyOf": [
+                                        {
+                                          "dataType": "constructor",
+                                          "index": 0,
+                                          "fields": [
+                                            {
+                                              "dataType": "bytes",
+                                              "title": "credential_hash"
+                                            }
+                                          ],
+                                          "title": "PubKeyCredential"
+                                        },
+                                        {
+                                          "dataType": "constructor",
+                                          "index": 1,
+                                          "fields": [
+                                            {
+                                              "dataType": "bytes",
+                                              "title": "credential_hash"
+                                            }
+                                          ],
+                                          "title": "ScriptCredential"
+                                        }
+                                      ],
+                                      "title": "value"
+                                    }
+                                  ],
+                                  "title": "StakingHash"
+                                },
+                                {
+                                  "dataType": "constructor",
+                                  "index": 1,
+                                  "fields": [
+                                    {
+                                      "dataType": "integer",
+                                      "title": "slot_no"
+                                    },
+                                    {
+                                      "dataType": "integer",
+                                      "title": "tx_index"
+                                    },
+                                    {
+                                      "dataType": "integer",
+                                      "title": "cert_index"
+                                    }
+                                  ],
+                                  "title": "StakingPtr"
+                                }
+                              ],
+                              "title": "staking_credential"
+                            }
+                          ],
+                          "title": "SomeStakingCredential"
+                        }
+                      ],
+                      "title": "staking_credential"
+                    }
+                  ],
+                  "title": "owner"
+                },
+                {
+                  "anyOf": [
+                    {
+                      "dataType": "constructor",
+                      "index": 1,
+                      "fields": [
+                        {
+                          "dataType": "constructor",
+                          "index": 0,
+                          "fields": [
+                            {
+                              "dataType": "constructor",
+                              "index": 0,
+                              "fields": [
+                                {
+                                  "anyOf": [
+                                    {
+                                      "dataType": "constructor",
+                                      "index": 0,
+                                      "fields": [],
+                                      "title": "NegInfPOSIXTime"
+                                    },
+                                    {
+                                      "dataType": "constructor",
+                                      "index": 1,
+                                      "fields": [
+                                        {
+                                          "dataType": "integer",
+                                          "title": "time"
+                                        }
+                                      ],
+                                      "title": "FinitePOSIXTime"
+                                    },
+                                    {
+                                      "dataType": "constructor",
+                                      "index": 2,
+                                      "fields": [],
+                                      "title": "PosInfPOSIXTime"
+                                    }
+                                  ],
+                                  "title": "end_time"
+                                },
+                                {
+                                  "dataType": "integer",
+                                  "title": "proposal_id"
+                                },
+                                {
+                                  "dataType": "constructor",
+                                  "index": 0,
+                                  "fields": [
+                                    {
+                                      "dataType": "bytes",
+                                      "title": "policy_id"
+                                    },
+                                    {
+                                      "dataType": "bytes",
+                                      "title": "token_name"
+                                    }
+                                  ],
+                                  "title": "tally_auth_nft"
+                                },
+                                {
+                                  "dataType": "bytes",
+                                  "title": "staking_vote_nft_policy"
+                                },
+                                {
+                                  "dataType": "constructor",
+                                  "index": 0,
+                                  "fields": [
+                                    {
+                                      "dataType": "bytes",
+                                      "title": "policy_id"
+                                    },
+                                    {
+                                      "dataType": "bytes",
+                                      "title": "token_name"
+                                    }
+                                  ],
+                                  "title": "governance_token"
+                                },
+                                {
+                                  "dataType": "bytes",
+                                  "title": "vault_ft_policy"
+                                }
+                              ],
+                              "title": "tally_params"
+                            },
+                            {
+                              "dataType": "integer",
+                              "title": "weight"
+                            },
+                            {
+                              "dataType": "integer",
+                              "title": "proposal_index"
+                            }
+                          ],
+                          "title": "participation"
+                        }
+                      ],
+                      "title": "DelegatedAddVote"
+                    },
+                    {
+                      "dataType": "constructor",
+                      "index": 2,
+                      "fields": [
+                        {
+                          "dataType": "constructor",
+                          "index": 0,
+                          "fields": [
+                            {
+                              "dataType": "constructor",
+                              "index": 0,
+                              "fields": [
+                                {
+                                  "anyOf": [
+                                    {
+                                      "dataType": "constructor",
+                                      "index": 0,
+                                      "fields": [],
+                                      "title": "NegInfPOSIXTime"
+                                    },
+                                    {
+                                      "dataType": "constructor",
+                                      "index": 1,
+                                      "fields": [
+                                        {
+                                          "dataType": "integer",
+                                          "title": "time"
+                                        }
+                                      ],
+                                      "title": "FinitePOSIXTime"
+                                    },
+                                    {
+                                      "dataType": "constructor",
+                                      "index": 2,
+                                      "fields": [],
+                                      "title": "PosInfPOSIXTime"
+                                    }
+                                  ],
+                                  "title": "end_time"
+                                },
+                                {
+                                  "dataType": "integer",
+                                  "title": "proposal_id"
+                                },
+                                {
+                                  "dataType": "constructor",
+                                  "index": 0,
+                                  "fields": [
+                                    {
+                                      "dataType": "bytes",
+                                      "title": "policy_id"
+                                    },
+                                    {
+                                      "dataType": "bytes",
+                                      "title": "token_name"
+                                    }
+                                  ],
+                                  "title": "tally_auth_nft"
+                                },
+                                {
+                                  "dataType": "bytes",
+                                  "title": "staking_vote_nft_policy"
+                                },
+                                {
+                                  "dataType": "constructor",
+                                  "index": 0,
+                                  "fields": [
+                                    {
+                                      "dataType": "bytes",
+                                      "title": "policy_id"
+                                    },
+                                    {
+                                      "dataType": "bytes",
+                                      "title": "token_name"
+                                    }
+                                  ],
+                                  "title": "governance_token"
+                                },
+                                {
+                                  "dataType": "bytes",
+                                  "title": "vault_ft_policy"
+                                }
+                              ],
+                              "title": "tally_params"
+                            },
+                            {
+                              "dataType": "integer",
+                              "title": "weight"
+                            },
+                            {
+                              "dataType": "integer",
+                              "title": "proposal_index"
+                            }
+                          ],
+                          "title": "participation"
+                        }
+                      ],
+                      "title": "DelegatedRetractVote"
+                    }
+                  ],
+                  "title": "redeemer"
+                }
+              ],
+              "title": "VotePermissionNFTParams"
+            },
+            {
+              "dataType": "constructor",
+              "index": 6,
+              "fields": [],
+              "title": "Nothing"
+            }
+          ]
+        }
+      },
+      "compiledCode": "5909e601000032323232323232323232323232323232323232323232323232323232323232323232323232323232323232323232322232323232323232323232323232323232323232323232323232323232323232323232323232323232323232323374a90001bb1498c8c8ccccccccd400c01403001c024018010038400840040b40b44888888888c8c8c8c8c8c8c94ccd5cd1918328800991a808080099982e19824a8010a4c464660aea002900008008a5eb404cc0040d80884c94ccd5cd19183308009982c9826a8052400426464a666ae68c8c1a04004c8c8cd4044400840054020c14540304c8c010008c8c8c8cccd405006c400c40084005400cc1454028c111401c4c98cd5ce249204f6e6c7920746865206f776e6572206d6179206d696e742074686973204e4654004984004c8cd40340644005402854ccd5cd1918330800a5013001023132633573892110496e76616c69642072656465656d6572004988cc0080dc004892610013237566aae78ccc174c0fd40088cdd79ba900235573a002264c66ae712401084b65794572726f7200498c129400c4004c125400c4004c8ccd401c04801040054004488c8d400c4004cc11d400452610511223303a3035303d5002302c50011222232498c8c8c8c8cccccd402008c03c4010400c4008400540114011200250031222222533357346460ac200266092646eb4d55cf199828991bab35573c6660a4a00c466ebcdd48011aab9d00113263357389201084b65794572726f7200499400c8cdd79ba900235573a002264c66ae712401084b65794572726f72004994005400c54ccd5cd19182b0800998249918230800991bab35573c6660a2a00a466ebcdd48011aab9d0011326335738921084b65794572726f72004994009200214984c98cd5ce24811d4e6f206f7468657220746f6b656e206d757374206265206d696e746564004984c98cd5ce24811e45786163746c79206e20746f6b656e206d757374206265206d696e746564004984888c8c94ccd5cd19182a080099823981da800a40002a002264c930800981aa800891b94500110511001232333048001223305400210014a2a002264c66ae712401104e616d654572726f723a207e626f6f6c004984c98cd5ce24810c4e616d654572726f723a2078004984c98cd5ce2481294e616d654572726f723a20766f74655f7065726d697373696f6e5f6e66745f746f6b656e5f6e616d65004984c98cd5ce2481144e616d654572726f723a2076616c696461746f72004984c98cd5ce2481194e616d654572726f723a20757365725f7369676e65645f7478004984c98cd5ce2481124e616d654572726f723a2074785f696e666f004984c98cd5ce2481124e616d654572726f723a2074785f696e666f004984c98cd5ce2481154e616d654572726f723a20746f6b656e5f6e616d65004984c98cd5ce24811e4e616d654572726f723a2072657175697265645f746f6b656e5f6e616d65004984c98cd5ce24811e4e616d654572726f723a2072657175697265645f746f6b656e5f6e616d65004984c98cd5ce2481134e616d654572726f723a2072656465656d6572004984c98cd5ce2481124e616d654572726f723a20707572706f7365004984c98cd5ce2481124e616d654572726f723a20707572706f7365004984c98cd5ce2481144e616d654572726f723a20706f6c6963795f6964004984c98cd5ce2481144e616d654572726f723a20706f6c6963795f6964004984c98cd5ce2481114e616d654572726f723a20706172616d73004984c98cd5ce2481134e616d654572726f723a206f776e5f6d696e74004984c98cd5ce24810c4e616d654572726f723a206e004984c98cd5ce24810f4e616d654572726f723a206d696e74004984c98cd5ce24810f4e616d654572726f723a206d696e74004984c98cd5ce24810e4e616d654572726f723a206c656e004984c98cd5ce24811e4e616d654572726f723a206765745f6d696e74696e675f707572706f7365004984c98cd5ce2481124e616d654572726f723a20636f6e74657874004984c98cd5ce2481124e616d654572726f723a20636f6e74657874004984c98cd5ce24812b4e616d654572726f723a20636865636b5f6d696e745f65786163746c795f6f6e655f776974685f6e616d65004984c98cd5ce2481294e616d654572726f723a20636865636b5f6d696e745f65786163746c795f6e5f776974685f6e616d65004984c98cd5ce2481164e616d654572726f723a20626c616b6532625f323536004984c98cd5ce2481114e616d654572726f723a20616d6f756e74004984c98cd5ce24810e4e616d654572726f723a20616c6c004984c98cd5ce2481124e616d654572726f723a2061646472657373004984c98cd5ce2481224e616d654572726f723a20566f74655065726d697373696f6e4e4654506172616d73004984c98cd5ce2481124e616d654572726f723a204d696e74696e67004980048ccc07cdd61801181500091bae00114bd6211801192999aab9f001132633573892010a496e6465784572726f72004984d5d100080091801992999aab9f00113263357389210a496e6465784572726f72004984d5d100080080111801992999aab9f001132633573892010a496e6465784572726f72004984d5d100080091bab30033025001230023253335573e002264c66ae712410a496e6465784572726f72004984d5d100080091801992999aab9f00113263357389210a496e6465784572726f72004984d5d100080080211804992999aab9f001132633573892010a496e6465784572726f72004984d5d100080080400411bae330090013248000c07000402002c0300308c034c94ccd55cf800899319ab9c4910a496e6465784572726f72004984d5d100080091806180c0009119980680111bad35573c002297ac0223300d3017002001223300d001371e00446466601c0024466e0000920024800140040300308c03c0040388dd71808180780091807980700091807192999aab9f00113263357389210a496e6465784572726f72004984d5d10008009111991809912999aab9f00115004133574060066ae84004cc008008d5d1000801001911998081112999aab9f001132633573892010a496e6465784572726f720049854ccd5cd19b87002480004d5d0800899980180199b8100248008d5d1000800801111991808112999aab9f00114a02a666ae68c00cd5d08008a5113300200235744002002004444664602044a666aae7c0045401054ccd5cd18019aba10011357420022660040046ae8800400800c888ccc8c03c8894ccd55cf801080089998018019aba20023300400135742004004006002e2088dd98011119ba548008cd5d0280119aba05001376293119000a80091aab9d3754002e1c8d55cf1baa00123253335573e002264c66ae7124010a496e6465784572726f72004984d5d0800800919ba548000cd5d01ba95001376293112999ab9a0021500114a046460020020021",
+      "hash": "8873a926c999e1c9f6ed1b07664f58e183ca56a64c5c16b234dacc64"
+    }
+  ]
+}

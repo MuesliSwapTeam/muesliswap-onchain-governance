@@ -72,32 +72,73 @@ def transform_redeemer_to_delegated_redeemer(
 
 
 def check_owner_authorized_operation(
-    owner_signed: bool,
     previous_state: StakingState,
     redeemer: StakingRedeemer,
     previous_state_input: TxOut,
     vote_permission_nft_policy: PolicyId,
-) -> None:
-    # Either the owner of the funds authorizes the operation by signing or by adding the correct NFT
-    if owner_signed:
-        return None
+    tx_info: TxInfo,
+) -> Value:
+    # The has to have authorized performing the operation by adding the correct NFT
 
     print("Owner did not sign tx, checking for permission NFT")
     assert isinstance(redeemer, AddVote) or isinstance(
         redeemer, RetractVote
     ), "Only adding or retracting votes is allowed without owner signature"
-    assert token_present_in_output(
-        Token(
-            vote_permission_nft_policy,
-            vote_permission_nft_token_name(
-                VotePermissionNFTParams(
-                    previous_state.params.owner,
-                    transform_redeemer_to_delegated_redeemer(redeemer, previous_state),
-                )
-            ),
+    spent_vote_permission_token = Token(
+        vote_permission_nft_policy,
+        vote_permission_nft_token_name(
+            VotePermissionNFTParams(
+                previous_state.params.owner,
+                transform_redeemer_to_delegated_redeemer(redeemer, previous_state),
+            )
         ),
+    )
+    assert token_present_in_output(
+        spent_vote_permission_token,
         previous_state_input,
     ), "Permission NFT was not spent in specified tally index input"
+    # check that the permission nft is burned upon execution
+    assert (
+        tx_info.mint[spent_vote_permission_token.policy_id][
+            spent_vote_permission_token.token_name
+        ]
+        == -1
+    ), "Permission NFT was not burned"
+
+    # check that the corresponding vote nft is being added in case of addvote,
+    # to prevent malicious execution of addvote
+    if isinstance(redeemer, AddVote):
+        participation = redeemer.participation
+        participation_token_mint_amount = 1
+    elif isinstance(redeemer, RetractVote):
+        participation = previous_state.participations[redeemer.participation_index]
+        participation_token_mint_amount = -1
+    else:
+        assert False, "Invalid redeemer type"
+    desired_nft_name = staking_vote_nft_name(
+        participation.proposal_index, participation.weight, participation.tally_params
+    )
+    participation_token = Token(
+        participation.tally_params.staking_vote_nft_policy, desired_nft_name
+    )
+    assert (
+        tx_info.mint[participation_token.policy_id][participation_token.token_name]
+        == participation_token_mint_amount
+    ), "Vote NFT was not minted/burned correctly"
+
+    # Return permissible extracted value from staking position
+    # By adding the vote permission token, we allow that it is removed from the staking position
+    # Moreover we enforce that the vote permission token is added/removed to the staking position depending on whether
+    # the vote is added or retracted / the token was minted or burned
+    return {
+        b"": {b"": -2_000_000},
+        spent_vote_permission_token.policy_id: {
+            spent_vote_permission_token.token_name: -1
+        },
+        participation_token.policy_id: {
+            participation_token.token_name: participation_token_mint_amount
+        },
+    }
 
 
 def check_enough_governance_tokens_in_output(
@@ -105,38 +146,40 @@ def check_enough_governance_tokens_in_output(
     next_state_output: TxOut,
     tx_validity_range: POSIXTimeRange,
 ) -> None:
-    latest_vote_time: ExtendedPOSIXTime = NegInfPOSIXTime()
+    fixed_gov_token_in_output = amount_of_token_in_output(
+        desired_next_state.params.governance_token, next_state_output
+    )
+    variable_gov_weight_list = variable_governance_weight_in_output_list(
+        next_state_output, desired_next_state.params.vault_ft_policy
+    )
     for p in desired_next_state.participations:
-        end_time = p.end_time
-        if ext_after_ext(end_time, latest_vote_time):
-            latest_vote_time = end_time
-
-    next_locked_governance_tokens = governance_weight_in_output(
-        next_state_output,
-        desired_next_state.params.governance_token,
-        desired_next_state.params.vault_ft_policy,
-        latest_vote_time,
-    )
-    minimum_required_governance_tokens = max(
-        [0]
-        + [
-            p.weight
-            for p in desired_next_state.participations
-            if not vote_has_ended(p.end_time, tx_validity_range)
-        ]
-    )
-    assert (
-        minimum_required_governance_tokens <= next_locked_governance_tokens
-    ), "Removed too many gov tokens"
+        if not vote_has_ended(p.tally_params.end_time, tx_validity_range):
+            next_locked_valid_governance_tokens = fixed_gov_token_in_output
+            tally_end_time = p.tally_params.end_time
+            if isinstance(tally_end_time, FinitePOSIXTime):
+                for w in variable_gov_weight_list:
+                    if w.valid_until <= tally_end_time.time:
+                        next_locked_valid_governance_tokens += w.weight
+            required_governance_tokens = p.weight
+            assert (
+                required_governance_tokens <= next_locked_valid_governance_tokens
+            ), "Removed too many gov tokens"
 
 
-def check_extract_max_2_ada(
-    previous_state_input: TxOut, next_state_output: TxOut
+def check_preserve_staking_position_value(
+    previous_state_input: TxOut,
+    next_state_output: TxOut,
+    expected_value_change: Value,
 ) -> None:
     prev_value = previous_state_input.value
     next_value = next_state_output.value
-    prev_value_minus_one_ada = subtract_value(prev_value, {b"": {b"": 2_000_000}})
-    check_greater_or_equal_value(next_value, prev_value_minus_one_ada)
+    prev_value_plus_changed_value = add_value(
+        prev_value,
+        expected_value_change,
+    )
+    # note that it is fine to add in particular ada so that minutxo is preserved
+    # however no unrelated tokens are to be added which would increase the output size
+    check_equal_except_ada_increase(next_value, prev_value_plus_changed_value)
 
 
 def validator(
@@ -172,14 +215,6 @@ def validator(
     )
     owner_controls_tx = user_signed_tx(previous_state.params.owner, tx_info)
 
-    # check that only the owner can perform operations
-    check_owner_authorized_operation(
-        owner_controls_tx,
-        previous_state,
-        redeemer,
-        previous_state_input,
-        vote_permission_nft_policy,
-    )
     # check that the new state is correct
     check_next_state_correct(next_state, desired_next_state)
     # check that the amount of governance tokens in the output is correct
@@ -187,7 +222,18 @@ def validator(
         desired_next_state, next_state_output, tx_info.valid_range
     )
     if not owner_controls_tx:
+        # check that only the owner can perform operations
+        expected_value_change = check_owner_authorized_operation(
+            previous_state,
+            redeemer,
+            previous_state_input,
+            vote_permission_nft_policy,
+            tx_info,
+        )
         # check that the executor may take a maximum of 2 ada from the output
-        check_extract_max_2_ada(previous_state_input, next_state_output)
+        # and adds/removes the correct NFTs
+        check_preserve_staking_position_value(
+            previous_state_input, next_state_output, expected_value_change
+        )
     # check that the staking state is not made too large accidentally
-    check_output_reasonably_sized(next_state_output, next_state)
+    check_staking_output_reasonably_sized(next_state_output, next_state)

@@ -1,7 +1,9 @@
+import fractions
 from typing import Optional
 
 import pycardano
 from opshin.prelude import *
+from opshin.std.fractions import Fraction
 
 
 def to_staking_credential(
@@ -165,3 +167,7 @@ def to_tx_info(
         {pycardano.datum_hash(r): r for r in tx.transaction_witness_set.redeemer},
         to_tx_id(tx_body.id),
     )
+
+
+def to_fraction(f: fractions.Fraction):
+    return Fraction(f.numerator, f.denominator)

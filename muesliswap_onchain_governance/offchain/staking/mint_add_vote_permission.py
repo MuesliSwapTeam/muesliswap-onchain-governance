@@ -4,6 +4,7 @@ import fire
 import pycardano
 
 from muesliswap_onchain_governance.onchain.tally.tally import BoxedInt
+from muesliswap_onchain_governance.onchain.util import reduced_proposal_params
 from muesliswap_onchain_governance.utils.network import show_tx, context
 from muesliswap_onchain_governance.utils.to_script_context import to_address
 from opshin.prelude import Token
@@ -126,11 +127,9 @@ def main(
 
     # generate redeemer for the vote permission
     participation = staking.Participation(
-        tally_auth_nft=tally_auth_nft_tk,
-        proposal_id=proposal_id,
+        tally_params=reduced_proposal_params(prev_tally_datum.params),
         weight=voting_power,
         proposal_index=proposal_index,
-        end_time=prev_tally_datum.params.end_time,
     )
     vote_permission_nft_redeemer = Redeemer(
         vote_permission_nft.VotePermissionNFTParams(
@@ -195,6 +194,8 @@ def main(
     context.submit_tx(signed_tx)
 
     show_tx(signed_tx)
+
+    return signed_tx, vote_permission_nft_redeemer.data.to_cbor()
 
 
 if __name__ == "__main__":

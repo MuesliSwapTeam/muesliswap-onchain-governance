@@ -100,7 +100,7 @@ def validator(
         check_correct_staking_vote_nft_mint(
             vote_index,
             weight,
-            tally_input_state,
+            tally_input_state.params,
             tx_info,
             staking_output,
         )

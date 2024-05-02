@@ -139,6 +139,7 @@ def main(
     )
 
     show_tx(signed_tx)
+    return signed_tx, treasurer_nft_name.hex()
 
 
 if __name__ == "__main__":

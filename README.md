@@ -36,9 +36,10 @@ You can use the [testnet faucet](https://docs.cardano.org/cardano-testnet/tools/
 ```bash
 python3 -m muesliswap_onchain_governance.create_key_pair creator
 python3 -m muesliswap_onchain_governance.create_key_pair voter
+python3 -m muesliswap_onchain_governance.create_key_pair vault_admin
 ```
 
-Then, build the smart contracts. Note that this requires the [`plutonomy-cli`](https://github.com/OpShin/plutonomy-cli) executable present in the `PATH` environment variable.
+Then, build the smart contracts. Note that this requires the [`aiken`](https://aiken-lang.org) executable present in the `PATH` environment variable. The original contract was built with version `aiken v1.0.26-alpha+075668b`.
 
 ```bash
 python3 -m muesliswap_onchain_governance.build

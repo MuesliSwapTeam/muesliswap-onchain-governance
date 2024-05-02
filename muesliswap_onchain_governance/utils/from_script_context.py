@@ -66,9 +66,9 @@ def from_value(a: Value) -> pycardano.Value:
         for token_name, amount in tokens.items():
             multi_asset += pycardano.MultiAsset(
                 {
-                    pycardano.ScriptHash(policy_id): {
-                        pycardano.AssetName(token_name): amount
-                    }
+                    pycardano.ScriptHash(policy_id): pycardano.Asset(
+                        {pycardano.AssetName(token_name): amount}
+                    )
                 }
             )
     return pycardano.Value(coin=lovelace, multi_asset=multi_asset)

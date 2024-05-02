@@ -30,6 +30,7 @@ def main(compress: bool = True):
     payment_vkey, payment_skey, payment_address = get_signing_info(
         owner, network=network
     )
+    signed_tx = None
 
     for contract in [
         simple_pool,
@@ -77,7 +78,8 @@ def main(compress: bool = True):
                 exit()
             except Exception as e:
                 print(f"Error: {e}")
-                sleep(30)
+                sleep(1)
+    return signed_tx
 
 
 if __name__ == "__main__":

@@ -100,7 +100,9 @@ def validator(
     vault_contract_address: Address,
     latest_existing_mint_time: ExtendedPOSIXTime,
     vault_admin: PubKeyHash,
-    governance_token: Token,
+    # token that is worth 1_000_000 new governance tokens because of lacking decimals
+    old_governance_token: Token,
+    new_governance_token: Token,
     redeemer: VaultFTRedeemer,
     context: ScriptContext,
 ) -> None:
@@ -128,7 +130,9 @@ def validator(
             vault_output.address == vault_contract_address
         ), "Vault position must be at the vault contract address"
         vault_datum: VaultDatum = resolve_datum_unsafe(vault_output, tx_info)
-        vault_amount = amount_of_token_in_output(governance_token, vault_output)
+        vault_amount = amount_of_token_in_output(
+            new_governance_token, vault_output
+        ) + 1_000_000 * amount_of_token_in_output(old_governance_token, vault_output)
         token_name = vault_ft_token_name(vault_datum)
         check_mint_exactly_n_with_name(
             tx_info.mint, vault_amount, purpose.policy_id, token_name

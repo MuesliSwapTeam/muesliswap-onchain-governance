@@ -250,6 +250,8 @@ def main(
 
     show_tx(signed_tx)
 
+    return signed_tx
+
 
 if __name__ == "__main__":
     fire.Fire(main)

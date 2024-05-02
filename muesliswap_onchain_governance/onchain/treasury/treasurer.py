@@ -115,6 +115,9 @@ def check_payout_executed_correctly(
             tally_result.proposal_id == redeemer.next_proposal_id
         ), "Incorrect update of the proposal id"
         fund_payout_params: FundPayoutParams = tally_result.winning_proposal
+        # check that the winning proposal is actually a fund payout
+        check_integrity(fund_payout_params)
+
         fund_payout_params_output = fund_payout_params.output
         payout_output = tx_info.outputs[redeemer.payout_index]
 
@@ -164,6 +167,24 @@ def check_treasurer_state_updated_correctly(
     check_output_reasonably_sized(next_treasurer_state_output, next_treasurer_state)
 
 
+def check_only_treasurer_and_value_store_contracts(
+    tx_info: TxInfo, number_value_store_inputs: int
+):
+    """
+    Check that the only involved contracts are the treasurer and the value store
+    This covers inputs, withdrawals, and mints
+    :param tx_info:
+    :param params:
+    :return:
+    """
+    assert len(tx_info.redeemers) == number_value_store_inputs + 1, "Too many redeemers"
+
+
+def check_at_most_n_token(value: Value, n: int) -> None:
+    total_tokens = sum([len(d.items()) for d in value.values()])
+    assert total_tokens <= n, "value contains too many tokens"
+
+
 def check_fund_distribution_correct(
     previous_treasurer_state_params: TreasurerParams, tx_info: TxInfo, payout: Value
 ):
@@ -197,9 +218,14 @@ def check_fund_distribution_correct(
     next_value_store_value = total_value(value_store_outputs)
     desired_new_value_store_value = subtract_value(previous_value_store_value, payout)
     check_greater_or_equal_value(next_value_store_value, desired_new_value_store_value)
-    # check that all outputs are reasonably sized
     for txo in value_store_outputs:
+        # check that all outputs are reasonably sized
         check_output_reasonably_sized(txo, valid_value_store_state)
+        # check that none of the outputs contains more than 5 tokens
+        check_at_most_n_token(txo.value, 5)
+
+    # check that no other contracts are satisfied by this transaction
+    check_only_treasurer_and_value_store_contracts(tx_info, len(value_store_inputs))
 
 
 def validator(

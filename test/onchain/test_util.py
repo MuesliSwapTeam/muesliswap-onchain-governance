@@ -11,7 +11,7 @@ def test_remove_participation_at_index(participants: list, index):
     try:
         assert 0 <= index < len(participants)
         exp_parts = copy(participants)
-        exp_parts.remove(participants[index])
+        exp_parts.pop(index)
     except AssertionError:
         exp_parts = None
     try:

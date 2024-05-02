@@ -18,6 +18,8 @@ kupo_url = (
     f"{kupo_protocol}://{kupo_host}:{kupo_port}" if kupo_host is not None else None
 )
 
+explorer = os.getenv("EXPLORER_TX", "http://localhost:5173/transactions")
+
 network = Network.TESTNET
 
 blockfrost_project_id = os.getenv("BLOCKFROST_PROJECT_ID", None)
@@ -46,4 +48,8 @@ except Exception:
 
 def show_tx(signed_tx: pycardano.Transaction):
     print(f"transaction id: {signed_tx.id}")
-    print(f"Cardanoscan: https://preprod.cexplorer.io/tx/{signed_tx.id}")
+    if network == Network.TESTNET:
+        print(f"Explorer: {explorer}/{signed_tx.id}")
+    else:
+        print(f"Explorer: https://cexplorer.io/tx/{signed_tx.id}")
+        print(f"Explorer: https://cardanoscan.io/transaction/{signed_tx.id}")

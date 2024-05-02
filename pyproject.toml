@@ -8,13 +8,13 @@ packages = [{include = "muesliswap_onchain_governance"}]
 
 [tool.poetry.dependencies]
 python = ">=3.10, <3.12"
-opshin = "^0.20.0"
-fire = "^0.5.0"
+opshin = "0.21.1"
+fire = "^0.6.0"
 pycardano = {git = "https://github.com/OpShin/pycardano", rev = "running_fixes"}
-peewee = "^3.17.1"
-ogmios = "^1.0.5"
-fastapi = "^0.109.2"
-uvicorn = {extras = ["all"], version = "^0.27.1"}
+peewee = "^3.17.3"
+ogmios = "^1.0.6"
+fastapi = "^0.110.1"
+uvicorn = {extras = ["all"], version = "^0.29.0"}
 gelidum = "^0.7.0"
 fastapi-cache2 = "^0.2.1"
 

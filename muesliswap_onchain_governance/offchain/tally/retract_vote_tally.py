@@ -4,6 +4,7 @@ import fire
 import pycardano
 
 from muesliswap_onchain_governance.onchain.tally.tally import BoxedInt
+from muesliswap_onchain_governance.onchain.util import reduced_proposal_params
 from muesliswap_onchain_governance.utils.network import show_tx, context
 from muesliswap_onchain_governance.utils.to_script_context import to_address
 from opshin.prelude import Token
@@ -95,7 +96,10 @@ def main(
         if not amount_of_token_in_value(tally_auth_nft_tk, u.output.amount):
             continue
         prev_tally_datum = tally.TallyState.from_cbor(u.output.datum.cbor)
-        if prev_tally_datum.params.proposal_id == participation.proposal_id:
+        if (
+            prev_tally_datum.params.proposal_id
+            == participation.tally_params.proposal_id
+        ):
             tally_utxo = u
             break
     assert tally_utxo, "Tally with given proposal id not found"
@@ -112,7 +116,7 @@ def main(
     # generate redeemer for the tally
     tally_redeemer = Redeemer(
         tally.RetractTallyVote(
-            proposal_index=participation.proposal_index,
+            proposal_index=participation.tally_params.proposal_id,
             weight=voting_power,
             voter_address=to_address(payment_address),
             tally_input_index=tally_input_index,
@@ -132,11 +136,9 @@ def main(
 
     # generate redeemer for the staking
     participation = staking.Participation(
-        tally_auth_nft=tally_auth_nft_tk,
-        proposal_id=participation.proposal_id,
+        tally_params=reduced_proposal_params(prev_tally_datum.params),
         weight=voting_power,
         proposal_index=participation.proposal_index,
-        end_time=prev_tally_datum.params.end_time,
     )
     staking_redeemer = Redeemer(
         staking.RetractVote(
@@ -159,7 +161,7 @@ def main(
     staking_vote_nft_name = staking_vote_nft.staking_vote_nft_name(
         participation.proposal_index,
         voting_power,
-        prev_tally_datum.params,
+        reduced_proposal_params(prev_tally_datum.params),
     )
     staking_vote_nft_tk = Token(
         staking_vote_nft_policy_id.payload, staking_vote_nft_name
@@ -210,6 +212,7 @@ def main(
     context.submit_tx(signed_tx)
 
     show_tx(signed_tx)
+    return signed_tx
 
 
 if __name__ == "__main__":

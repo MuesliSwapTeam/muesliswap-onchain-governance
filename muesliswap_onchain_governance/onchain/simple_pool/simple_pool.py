@@ -8,6 +8,7 @@ from muesliswap_onchain_governance.onchain.simple_pool.classes import *
 @dataclass
 class SwapAsset(PlutusData):
     CONSTR_ID = 1
+    license_input_index: int
     pool_input_index: int
     pool_output_index: int
     swap_token: Token
@@ -17,6 +18,7 @@ class SwapAsset(PlutusData):
 @dataclass
 class AddLiquidity(PlutusData):
     CONSTR_ID = 2
+    license_input_index: int
     pool_input_index: int
     pool_output_index: int
     deposit_token_a: int
@@ -25,6 +27,7 @@ class AddLiquidity(PlutusData):
 @dataclass
 class RemoveLiquidity(PlutusData):
     CONSTR_ID = 3
+    license_input_index: int
     pool_input_index: int
     pool_output_index: int
     burn_liquidity_token: int
@@ -39,6 +42,28 @@ class PoolUpgrade(PlutusData):
 
 
 PoolAction = Union[AddLiquidity, RemoveLiquidity, SwapAsset, PoolUpgrade]
+
+
+def license_validity_from_name(license_name: TokenName) -> POSIXTime:
+    """
+    Extracts the validity time from a license name
+    """
+    return unsigned_int_from_bytes_big(license_name[16:32])
+
+
+def check_valid_license_present(
+    license_input_index: int, tx_info: TxInfo, license_policy_id: PolicyId
+):
+    """
+    Checks that a valid license is present in the transaction
+    """
+    license_input = tx_info.inputs[license_input_index].resolved
+    # note: no other licenses should be present in the input to ensure that this passes
+    license_nft_name = license_input.value[license_policy_id].keys()[0]
+    license_expiry_date = license_validity_from_name(license_nft_name)
+    assert before_ext(
+        tx_info.valid_range, FinitePOSIXTime(license_expiry_date)
+    ), "License is expired"
 
 
 def check_change_liquidity(
@@ -245,6 +270,8 @@ def check_upgrade(
         True,
     )
     pool_upgrade_params: PoolUpgradeParams = tally_result.winning_proposal
+    # check that the winning proposal is actually a pool upgrade
+    check_integrity(pool_upgrade_params)
 
     # check that this specific pool is being upgraded
     raw_old_pool_nft = pool_upgrade_params.old_pool_nft
@@ -259,11 +286,15 @@ def check_upgrade(
     raw_new_pool_params = pool_upgrade_params.new_pool_params
     if isinstance(raw_new_pool_params, UpgradeablePoolParams):
         new_pool_params = raw_new_pool_params
+        assert (
+            new_pool_params.last_applied_proposal_id == tally_result.proposal_id
+        ), "Last applied proposal id must match the proposal id of the tally"
     else:
         # preserve old parameters except for the proposal id
         new_pool_params = UpgradeablePoolParams(
             datum.up_pool_params.fee,
             datum.up_pool_params.auth_nft,
+            datum.up_pool_params.license_policy_id,
             tally_result.proposal_id,
         )
     raw_new_pool_address = pool_upgrade_params.new_pool_address
@@ -298,8 +329,18 @@ def validator(datum: PoolState, redeemer: PoolAction, context: ScriptContext) ->
 
     own_output = context.tx_info.outputs[redeemer.pool_output_index]
     if isinstance(redeemer, AddLiquidity) or isinstance(redeemer, RemoveLiquidity):
+        check_valid_license_present(
+            redeemer.license_input_index,
+            context.tx_info,
+            datum.up_pool_params.license_policy_id,
+        )
         check_change_liquidity(datum, redeemer, context, own_input_info, own_output)
     elif isinstance(redeemer, SwapAsset):
+        check_valid_license_present(
+            redeemer.license_input_index,
+            context.tx_info,
+            datum.up_pool_params.license_policy_id,
+        )
         check_swap(datum, redeemer, context, own_input_info, own_output)
     elif isinstance(redeemer, PoolUpgrade):
         check_upgrade(datum, redeemer, context, own_input_info, own_output)

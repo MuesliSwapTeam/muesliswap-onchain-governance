@@ -3,6 +3,8 @@ from hashlib import sha256
 from opshin.prelude import *
 from muesliswap_onchain_governance.onchain.utils.ext_interval import *
 from opshin.std.builtins import *
+from opshin.std.fractions import *
+from opshin.std.integrity import check_integrity
 
 ProposalId = int
 
@@ -41,8 +43,13 @@ class ProposalParams(PlutusData):
     """
 
     CONSTR_ID = 0
+    # the required quorum for the proposal to be valid
     quorum: int
+    # the required threshold for the winning proposal to win
+    winning_threshold: Fraction
+    # the proposals that can be voted on
     proposals: List[Anything]
+    # the end time of the vote
     end_time: ExtendedPOSIXTime
     proposal_id: ProposalId
     tally_auth_nft: Token
@@ -50,6 +57,32 @@ class ProposalParams(PlutusData):
     staking_address: Address
     governance_token: Token
     vault_ft_policy: PolicyId
+
+
+@dataclass
+class ReducedProposalParams(PlutusData):
+    """
+    Non-updatable parameters of a proposal, to be used in staking to reference a Tally with less data
+    """
+
+    CONSTR_ID = 0
+    end_time: ExtendedPOSIXTime
+    proposal_id: ProposalId
+    tally_auth_nft: Token
+    staking_vote_nft_policy: PolicyId
+    governance_token: Token
+    vault_ft_policy: PolicyId
+
+
+def reduced_proposal_params(params: ProposalParams) -> ReducedProposalParams:
+    return ReducedProposalParams(
+        params.end_time,
+        params.proposal_id,
+        params.tally_auth_nft,
+        params.staking_vote_nft_policy,
+        params.governance_token,
+        params.vault_ft_policy,
+    )
 
 
 @dataclass
@@ -70,11 +103,9 @@ class Participation(PlutusData):
     """
 
     CONSTR_ID = 0
-    tally_auth_nft: Token
-    proposal_id: ProposalId
+    tally_params: ReducedProposalParams
     weight: int
     proposal_index: int
-    end_time: ExtendedPOSIXTime
 
 
 @dataclass
@@ -205,14 +236,14 @@ def resolve_linear_output(
 
 
 def staking_vote_nft_name(
-    vote_index: int, weight: int, tally_params: ProposalParams
+    vote_index: int, weight: int, tally_params: ReducedProposalParams
 ) -> TokenName:
     return sha256(f"{vote_index}|{weight}|".encode() + tally_params.to_cbor()).digest()
 
 
 def check_mint_exactly_one_to_address(mint: Value, token: Token, staking_output: TxOut):
     """
-    Check that exactly one token is minted and sent to address
+    Check that exactly one token is minted and also sent to given address/output
     Also ensures that no other token of this policy is minted
     """
     check_mint_exactly_one_with_name(mint, token.policy_id, token.token_name)
@@ -224,17 +255,17 @@ def check_mint_exactly_one_to_address(mint: Value, token: Token, staking_output:
 def check_correct_staking_vote_nft_mint(
     vote_index: int,
     weight: int,
-    tally_input_state: TallyState,
+    tally_input_state_params: ProposalParams,
     tx_info: TxInfo,
     next_staking_state_output: TxOut,
 ) -> None:
     desired_nft_name = staking_vote_nft_name(
-        vote_index, weight, tally_input_state.params
+        vote_index, weight, reduced_proposal_params(tally_input_state_params)
     )
 
     check_mint_exactly_one_to_address(
         tx_info.mint,
-        Token(tally_input_state.params.staking_vote_nft_policy, desired_nft_name),
+        Token(tally_input_state_params.staking_vote_nft_policy, desired_nft_name),
         next_staking_state_output,
     )
 
@@ -246,7 +277,7 @@ def check_correct_vote_nft_burn(
     tx_info: TxInfo,
 ) -> None:
     desired_nft_name = staking_vote_nft_name(
-        vote_index, weight, tally_input_state.params
+        vote_index, weight, reduced_proposal_params(tally_input_state.params)
     )
 
     assert (
@@ -266,23 +297,37 @@ def check_greater_or_equal_value(a: Value, b: Value) -> None:
             ), f"Value of {policy_id.hex()}.{token_name.hex()} is too low"
 
 
-def check_preserves_value(
-    previous_state_input: TxOut, next_state_output: TxOut
-) -> None:
-    """
-    Check that the value of the previous state input is equal to the value of the next state output
-    """
-    previous_state_value = previous_state_input.value
-    next_state_value = next_state_output.value
-    check_greater_or_equal_value(next_state_value, previous_state_value)
-
-
 def check_output_reasonably_sized(output: TxOut, attached_datum: Anything) -> None:
     """
     Check that the output is reasonably sized
+    2000 bytes is sufficient for a sizable number of detailed proposals in tallies
     """
-    assert len(output.to_cbor()) <= 1000, "Output value too large"
-    assert len(serialise_data(attached_datum)) <= 1000, "Attached datum too large"
+    assert len(output.to_cbor()) <= 2000, "Output value too large"
+    assert len(serialise_data(attached_datum)) <= 2000, "Attached datum too large"
+
+
+def check_staking_output_reasonably_sized(
+    output: TxOut, attached_datum: Anything
+) -> None:
+    """
+    Check that the staking output is reasonably sized
+
+    - staking state itself is ~200 bytes
+    - reduce the parts of the tally params that are stored in a participation (as of dd2cdde ~200 bytes)
+    - each participation token is ~60 bytes
+    - each governance/vault ft token is ~60 bytes (expected n <= 5)
+    - maximum tx size is ~16kb
+
+    if we restrict a staking position to participating in at most 25 votes at the same time, we arrive at 200 + 5*60 + (30*(200+60)) = ~7000 bytes
+    which fits nicely together with another input when present twice in a transaction (input+output)
+    """
+    # datum is inlined => datum counts toward size of output
+    d = output.datum
+    if isinstance(d, SomeOutputDatum):
+        assert len(output.to_cbor()) <= 7000, "Output value too large"
+    else:
+        assert len(output.to_cbor()) <= 1800, "Output value too large"
+        assert len(serialise_data(attached_datum)) <= 5200, "Attached datum too large"
 
 
 def list_index(listy: List[int], key: int) -> int:
@@ -324,8 +369,13 @@ def winning_tally_result(
     assert not enforce_vote_ended or after_ext(
         tx_info.valid_range, tally_state.params.end_time
     ), "Tally has not ended yet"
+    total_votes = sum(tally_state.votes)
+    assert total_votes >= tally_state.params.quorum, "Quorum not reached"
     winning_proposal_votes = max(tally_state.votes)
-    assert winning_proposal_votes >= tally_state.params.quorum, "Quorum not reached"
+    assert ge_fraction(
+        Fraction(winning_proposal_votes, total_votes),
+        tally_state.params.winning_threshold,
+    ), "Winning threshold not reached"
     winning_proposal_index = list_index(tally_state.votes, winning_proposal_votes)
     return TallyResult(
         tally_state.params.proposals[winning_proposal_index],
@@ -427,3 +477,38 @@ def amount_of_token_in_value(
     value: Value,
 ) -> int:
     return value.get(token.policy_id, {b"": 0}).get(token.token_name, 0)
+
+
+def check_equal_except_ada_increase(a: Value, b: Value) -> None:
+    """
+    Check that the value of a is equal to the value of b, i.e. a == b
+    except for the ada amount which can increase, i.e. a["ada"] >= b["ada"]
+    """
+    pids = merge_without_duplicates(a.keys(), b.keys())
+    for policy_id in pids:
+        if policy_id == b"":
+            assert a.get(policy_id, EMTPY_TOKENNAME_DICT).get(b"", 0) >= b.get(
+                policy_id, EMTPY_TOKENNAME_DICT
+            ).get(b"", 0), f"Value of lovelace too low"
+        else:
+            a_tnd = a.get(policy_id, EMTPY_TOKENNAME_DICT)
+            b_tnd = b.get(policy_id, EMTPY_TOKENNAME_DICT)
+            tns = merge_without_duplicates(a_tnd.keys(), b_tnd.keys())
+            for token_name in tns:
+                assert a.get(policy_id, EMTPY_TOKENNAME_DICT).get(
+                    token_name, 0
+                ) == b.get(policy_id, EMTPY_TOKENNAME_DICT).get(
+                    token_name, 0
+                ), f"Value of additional token is not equal"
+
+
+def check_preserves_value(
+    previous_state_input: TxOut, next_state_output: TxOut
+) -> None:
+    """
+    Check that the value of the previous state input is equal to the value of the next state output
+    No additional tokens are to be added (except for ada) and no tokens are to be removed
+    """
+    previous_state_value = previous_state_input.value
+    next_state_value = next_state_output.value
+    check_equal_except_ada_increase(next_state_value, previous_state_value)

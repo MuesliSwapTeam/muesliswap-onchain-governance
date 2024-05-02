@@ -71,9 +71,9 @@ def test_valid_license_names():
         assert False
     except AssertionError:
         pass
-    license_name_padded = proposal_id.to_bytes(3, "big") + (
+    license_name_padded = proposal_id.to_bytes(16, "big") + (
         transaction_validity_lower_bound + maximum_future_validity
-    ).to_bytes(32 - 3, "big")
+    ).to_bytes(32 - 16, "big")
     check_valid_license_name(
         license_name_padded,
         proposal_id,

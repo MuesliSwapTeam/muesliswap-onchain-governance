@@ -17,7 +17,9 @@ It is not allowed to mint several vote permission NFTs in a single transaction.
 from muesliswap_onchain_governance.onchain.staking.staking_util import *
 
 
-def validator(redeemer: VotePermissionNFTParams, context: ScriptContext) -> None:
+def validator(
+    redeemer: Union[VotePermissionNFTParams, Nothing], context: ScriptContext
+) -> None:
     """
     Permission NFT
 
@@ -31,10 +33,12 @@ def validator(redeemer: VotePermissionNFTParams, context: ScriptContext) -> None
         # Burning NFTs is always allowed
         # but we need to make sure that all mints with this policy are burning
         pass
-    else:
+    elif isinstance(redeemer, VotePermissionNFTParams):
         token_name = vote_permission_nft_token_name(redeemer)
         assert user_signed_tx(
             redeemer.owner, tx_info
         ), "Only the owner may mint this NFT"
 
         check_mint_exactly_one_with_name(tx_info.mint, purpose.policy_id, token_name)
+    else:
+        assert False, "Invalid redeemer"

@@ -20,7 +20,7 @@ def module_name(module):
     return Path(module.__file__).stem
 
 
-def get_contract(name, compressed=False):
+def get_contract(name, compressed=True):
     with open(
         build_dir.joinpath(f"{name}{'_compressed' if compressed else ''}/script.cbor")
     ) as f:
